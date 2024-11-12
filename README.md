@@ -1,0 +1,42 @@
+This is the code implementation for Chenkai Wu's honours project (Deep Active Learning with Rationales) supervised by Dr Lan Du.
+
+Active learning (AL) attempts to measure the value of data, selecting only the most valuable portion for labeling to reduce labeling costs. While deep active learning (DAL) combines deep learning and active learning, aiming to maintain good performance of Deep Learning models with as little data as possible.
+
+<p align="center">
+<img src="dal.png" width="700"> 
+</p>
+
+
+In this honours project, we designed a new platform for DAL which can help researchers to evalute various DAL algorithms' performance. 
+
+This platform is built on a modular structure, making it easy to modify and add new algorithms and tasks, laying a solid foundation for further expansion in the future.
+
+<p align="center">
+<img src="modules.png" width="700"> 
+</p>
+
+This platform also includes 21 DAL algorithms, eight of which are the latest (introduced in 2022 or later). Among these, two algorithms address open-set scenarios, and two handle imbalanced-sets.
+
+<div style="display: flex; justify-content: space-between;">
+    <img src="algorithms.png" width="650">
+    <img src="classAlgorithm.png" width="650">
+</div>
+
+Finally, we extend our sincere gratitude to the authors of previous DAL algorithms and platforms. These prior contributions have greatly benefited this honors project.
+
+### References
+
+* MQ-Net\[[code](https://github.com/kaist-dmlab/MQNet)\] : Meta-Query-Net: Resolving Purity-Informativeness Dilemma in Open-set Active Learning, Park et al. 2022 NeurIPS
+* TiDAL\[[code](https://github.com/hyperconnect/TiDAL)\]: TiDAL: Learning Training Dynamics for Active Learning, Kye et al. 2023 ICCV
+* Class-Balanced-AL\[[code](https://github.com/Javadzb/Class-Balanced-AL)\]: Class-Balanced Active Learning for Image Classification, Bengar et al. 2022 WACV
+* ALFA-Mix\[[code](https://github.com/AminParvaneh/alpha_mix_active_learning)\]: Active Learning by Feature Mixing, Parvaneh et al. 2022 CVPR
+* LfOSA\[[code](https://github.com/ningkp/LfOSA)\]: Active Learning for Open-set Annotation, Ning et al. 2022 CVPR
+* NoiseStability\[[code](https://github.com/phanxuanphucnd/Deep-AL-with-Noise-Stability)\]: Deep Active Learning with Noise Stability, Li et al. 2024 AAAI
+* SAAL\[[code](https://github.com/YoonyeongKim/SAAL)\]: SAAL: Sharpness-Aware Active Learning, Kim et al. 2023 ICML
+* VeSSAL\[[code](https://github.com/asaran/VeSSAL)\]: Streaming Active Learning with Deep Neural Networks, Saran et al. 2023 ICML
+* DeepAL+\[[code](https://github.com/SineZHAN/deepALplus)\]: DeepAL+: Deep Active Learning Toolkit, Zhan et al. 2022
+* Coreset \[[code](https://github.com/svdesai/coreset-al)\] : Active Learning for Convolutional Neural Networks: A Core-Set Approach, Sener et al. 2018 ICLR
+* LL \[[code](https://github.com/Mephisto405/Learning-Loss-for-Active-Learning)\] : Learning Loss for Active Learning, Yoo et al. 2019 CVPR
+* BADGE \[[code](https://github.com/JordanAsh/badge)\] : Deep Batch Active Learning by Diverse, Uncertain Gradient Lower Bounds, Jordan et al. 2020 ICLR
+* CCAL \[[code](https://github.com/RUC-DWBI-ML/CCAL)\] : Contrastive Coding for Active Learning under Class Distribution Mismatch, Du et al. 2021 ICCV
+* SIMILAR \[[code](https://github.com/decile-team/distil)\] : SIMILAR: Submodular Information Measures based Active Learning in Realistic Scenarios, Kothawade et al. 2021 NeurIPS
