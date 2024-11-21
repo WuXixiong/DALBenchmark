@@ -24,6 +24,29 @@ This platform also includes 21 DAL algorithms, eight of which are the latest (in
 
 Finally, we extend our sincere gratitude to the authors of previous DAL algorithms and platforms. These prior contributions have greatly benefited this honors project.
 
+### Environment Setup
+
+0. Preparation
+   - Install Ubuntu. I am using version 22.04.
+   - Install the Nvidia GPU driver. For my RTX 4090, I installed version 535.183.01.
+   - Install CUDA and NVCC (CUDA compiler driver). I am using version 12.2.
+   - (Optional, for setting up a virtual environment) Install Anaconda.
+
+1. Create a Virtual Environment and Install PyTorch
+   - If using Anaconda, you can set up a virtual environment based on Python 3.9 with the following command:
+     * `conda create -n 'dalb' python=3.9`
+     * `conda activate dalb`
+
+2. Install Most Dependencies
+   - This step can be completed using the `requirements.txt` file provided by the platform via `pip`.
+     * `pip install -r requirements.txt`
+
+3. Install the Final Dependency: submodlib
+   - For this step, I recommend using the "Alternative 2" method provided by the submodlib [GitHub repository](https://github.com/decile-team/submodlib).
+     * `git clone https://github.com/decile-team/submodlib.git`
+     * `cd submodlib`
+     * `pip install .`
+
 ### References
 
 * MQ-Net\[[code](https://github.com/kaist-dmlab/MQNet)\] : Meta-Query-Net: Resolving Purity-Informativeness Dilemma in Open-set Active Learning, Park et al. 2022 NeurIPS

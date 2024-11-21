@@ -1,3 +1,11 @@
+--index-url https://download.pytorch.org/whl/cu121
+torch==2.2.2
+torchvision==0.17.2
+torchaudio==2.2.2
+--index-url https://pypi.org/simple
+torchtext==0.17.2
+torchdata==0.7.1
+portalocker==2.10.1
 absl-py==2.1.0
 anyio==4.2.0
 appdirs==1.4.4
@@ -146,9 +154,6 @@ soupsieve==2.5
 stack-data==0.2.0
 structlog==24.1.0
 sympy==1.12
-tensorboard==2.2.2
-tensorboard-plugin-wit==1.8.1
-tensorboardX==2.1
 terminado==0.17.1
 threadpoolctl==3.3.0
 timm==1.0.7
@@ -171,4 +176,6 @@ wheel==0.41.2
 wrapt==1.16.0
 xmltodict==0.13.0
 zipp==3.17.0
-seaborn
+seaborn==0.13.2
+tensorboard==2.18.0
+transformers==4.46.2

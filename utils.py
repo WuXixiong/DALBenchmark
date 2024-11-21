@@ -502,6 +502,57 @@ def train_epoch_lfosa(args, models, criterion, optimizers, dataloaders, criterio
         xent_losses.update(loss_xent.item(), labels.size(0))
         cent_losses.update(loss_cent.item(), labels.size(0))
 
+def train_epoch_nlp(args, models, criterion, optimizers, dataloaders, writer, epoch):
+    models['backbone'] = models['backbone'].to(args.device)
+    models['backbone'].train()
+
+    running_loss = 0.0
+    correct_predictions = 0
+    total_predictions = 0
+    total_batches = len(dataloaders['train'])
+
+    for i, data in enumerate(dataloaders['train']):
+        # Extract input_ids, attention_mask, and labels from the dictionary
+        input_ids = data['input_ids'].to(args.device)
+        attention_mask = data['attention_mask'].to(args.device)
+        labels = data['labels'].to(args.device)
+
+        # Zero the gradients
+        optimizers['backbone'].zero_grad()
+
+        # Forward pass
+        outputs = models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+        scores = outputs.logits  # For BertForSequenceClassification, logits contain class probabilities
+
+        # Compute loss
+        target_loss = criterion(scores, labels)
+        m_backbone_loss = torch.sum(target_loss) / target_loss.size(0)
+        loss = m_backbone_loss
+
+        # Backward pass and optimization
+        loss.backward()
+        optimizers['backbone'].step()
+
+        # Update running loss
+        running_loss += loss.item()
+
+        # Calculate predictions and accuracy
+        _, preds = torch.max(scores, dim=1)
+        correct_predictions += torch.sum(preds == labels).item()
+        total_predictions += labels.size(0)
+
+        # Log training loss every 100 batches
+        if (i + 1) % 100 == 0:
+            avg_loss = running_loss / 100
+            writer.add_scalar('training_loss_batch', avg_loss, epoch * total_batches + i)
+            running_loss = 0.0
+
+    # Calculate epoch metrics
+    epoch_loss = running_loss / total_batches
+    epoch_accuracy = correct_predictions / total_predictions
+
+    return epoch_loss, epoch_accuracy
+
 def train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch):
     models['backbone'].train()
 
@@ -515,31 +566,25 @@ def train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch)
 
         optimizers['backbone'].zero_grad()
 
-        # 模型前向传播
         scores, _ = models['backbone'](inputs)
         target_loss = criterion(scores, labels)
         m_backbone_loss = torch.sum(target_loss) / target_loss.size(0)
         loss = m_backbone_loss
 
-        # 反向传播与优化
         loss.backward()
         optimizers['backbone'].step()
 
-        # 记录损失
         running_loss += loss.item()
 
-        # 计算精确度: 通过 softmax 得到预测的类别
         _, preds = torch.max(scores, 1)
         correct_predictions += torch.sum(preds == labels).item()
         total_predictions += labels.size(0)
 
-        # 每 100 个 batch 记录一次平均损失
         if (i + 1) % 100 == 0:
             avg_loss = running_loss / 100
             writer.add_scalar('training_loss_batch', avg_loss, epoch * total_batches + i)
             running_loss = 0.0
 
-    # 计算当前 epoch 的平均损失和精确度
     epoch_loss = running_loss / total_batches
     epoch_accuracy = correct_predictions / total_predictions
 
@@ -750,7 +795,10 @@ def train(args, models, criterion, optimizers, schedulers, dataloaders, criterio
 
     if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'CCAL', 'SIMILAR', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL']:  # add new methods like VAAL
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
-            epoch_loss, epoch_accuracy = train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch)
+            if args.dataset in ['AGNEWS']:
+                epoch_loss, epoch_accuracy = train_epoch_nlp(args, models, criterion, optimizers, dataloaders, writer, epoch)
+            else:
+                epoch_loss, epoch_accuracy = train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch)
             schedulers['backbone'].step()
             writer.add_scalar('learning_rate', schedulers['backbone'].get_last_lr()[0], epoch)
             writer.add_scalar('training_loss', epoch_loss, epoch)
@@ -834,6 +882,39 @@ def test(args, models, dataloaders):
         print('Test acc: * Prec@1 {top1.avg:.3f}'.format(top1=top1))
 
     return top1.avg
+
+def test_nlp(args, models, dataloaders):
+    top1 = AverageMeter('Acc@1', ':6.2f')
+
+    # Switch to evaluation mode
+    models['backbone'].eval()
+
+    with torch.no_grad():
+        for i, data in enumerate(dataloaders['test']):
+            # Extract and move data to the correct device
+            input_ids = data['input_ids'].to(args.device)
+            attention_mask = data['attention_mask'].to(args.device)
+            labels = data['labels'].to(args.device)
+
+            # Compute output
+            with torch.no_grad():
+                if args.method == 'TIDAL':
+                    scores, _, _ = models['backbone'](
+                        input_ids=input_ids, attention_mask=attention_mask, method='TIDAL'
+                    )
+                else:
+                    scores = models['backbone'](
+                        input_ids=input_ids, attention_mask=attention_mask
+                    ).logits  # Get logits from BertForSequenceClassification
+
+            # Measure accuracy and record loss
+            prec1 = accuracy(scores.data, labels, topk=(1,))[0]
+            top1.update(prec1.item(), input_ids.size(0))
+
+        print('Test acc: * Prec@1 {top1.avg:.3f}'.format(top1=top1))
+
+    return top1.avg
+
 
 def test_ood(args, models, dataloaders):
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -947,7 +1028,11 @@ def get_more_args(args):
 def get_models(args, nets, model, models):
     # Normal
     if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL']: # add new methods
-        backbone = nets.__dict__[model](args.channel, args.num_IN_class, args.im_size).to(args.device)
+        if args.dataset in ['AGNEWS']:
+            from transformers import BertForSequenceClassification
+            backbone = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=4)
+        else:
+            backbone = nets.__dict__[model](args.channel, args.num_IN_class, args.im_size).to(args.device)
         if args.device == "cpu":
             print("Using CPU.")
         elif args.data_parallel == True:
@@ -1047,7 +1132,7 @@ def get_models(args, nets, model, models):
         models = {'backbone': backbone, 'ood_detection': ood_detection}
         if args.method == 'EOAL':
             models['model_bc'] = model_bc
-    
+
     return models
 
 def init_mqnet(args, nets, models, optimizers, schedulers):

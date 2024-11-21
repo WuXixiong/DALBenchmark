@@ -10,8 +10,10 @@ from datasets.cifar100 import MyCIFAR100
 from datasets.imagenet import MyImageNet
 from datasets.mnist import MyMNIST
 from datasets.svhn import MySVHN
+from datasets.agnews import MyAGNewsDataset
 from torchvision import datasets
 import torchvision.transforms as T
+from transformers import BertTokenizer
 import os
 
 CIFAR10_SUPERCLASS = list(range(10))  # one class
@@ -90,7 +92,6 @@ def get_dataset(args, trial):
 
     # Dataset
     if args.dataset == 'CIFAR10':
-
         file_path = args.data_path + '/cifar10/'
         train_set = MyCIFAR10(file_path, train=True, download=True, transform=train_transform)
         unlabeled_set = MyCIFAR10(file_path, train=True, download=True, transform=test_transform)
@@ -139,6 +140,15 @@ def get_dataset(args, trial):
         train_set = MyTinyImageNet(file_path + 'train/', transform=train_transform)
         unlabeled_set = MyTinyImageNet(file_path + 'train/', transform=test_transform)
         test_set = MyTinyImageNet(file_path + 'val/', transform=test_transform)
+    elif args.dataset == 'AGNEWS':
+        # Load the AGNEWS dataset
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')  # Use a pre-trained tokenizer
+        file_path = args.data_path + '/agnews/'  # Adjust the path if necessary
+        
+        # Initialize datasets for training, validation, and testing
+        train_set = MyAGNewsDataset(split='train', tokenizer=tokenizer, max_length=128)
+        test_set = MyAGNewsDataset(split='test', tokenizer=tokenizer, max_length=128)
+        unlabeled_set = MyAGNewsDataset(split='train', tokenizer=tokenizer, max_length=128)
 
     # class-split
     if args.dataset in ['CIFAR10', 'SVHN']:
@@ -152,6 +162,20 @@ def get_dataset(args, trial):
             args.num_IN_class = 4
         # Calculate untarget_list outside the openset condition if it applies in both scenarios
         args.untarget_list = list(np.setdiff1d(list(range(0, 10)), list(args.target_list)))
+    if args.dataset == 'AGNEWS':
+        # Define input size, number of classes, and initial class list
+        args.input_size = 128  # BERT input size (maximum sequence length)
+        args.target_list = list(range(4))  # AGNEWS has 4 classes: ['World', 'Sports', 'Business', 'Sci/Tech']
+        args.num_IN_class = 4  # Number of in-distribution classes
+
+        if args.openset:
+            # Settings specific to openset scenario
+            args.target_lists = [[0, 1], [2, 3], [0, 2], [1, 3]]  # Example splits for trials
+            args.target_list = args.target_lists[trial]  # Choose one split based on the trial
+            args.num_IN_class = len(args.target_list)  # Update the number of in-distribution classes
+
+        # Define untarget_list as the complement of target_list
+        args.untarget_list = list(np.setdiff1d(list(range(4)), list(args.target_list)))
     if args.dataset == 'MNIST':
         args.input_size = 28 * 28 * 1
         args.target_list = list(range(10))
@@ -205,7 +229,7 @@ def get_dataset(args, trial):
 
 
     # class converting
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN']: # add mnist
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS']: # add mnist
         for i, c in enumerate(args.untarget_list):
             train_set.targets[np.where(train_set.targets == c)[0]] = int(args.n_class)
             test_set.targets[np.where(test_set.targets == c)[0]] = int(args.n_class)
@@ -319,10 +343,14 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
     ood_rate = args.ood_rate
 
     if initial:
-        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN']:
+        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS']:
             if args.openset:
-                L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
-                O_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] >= len(classes)]
+                if args.dataset in ['AGNEWS']:
+                    L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
+                    O_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] >= len(classes)]
+                else:
+                    L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
+                    O_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] >= len(classes)]
 
                 # n_ood = round(len(L_total) * (ood_rate / (1 - ood_rate)))
                 n_ood = round(ood_rate * (len(L_total) + len(O_total)))
@@ -338,8 +366,6 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
                 
                 L_index = random.sample(L_total, budget - int(budget * ood_rate))
                 O_index = random.sample(O_total, int(budget * ood_rate))
-                # L_index = random.sample(L_total, int(budget))
-                # O_index = random.sample(O_total, int(budget * (ood_rate / (1-ood_rate)))) # ensure the initial labelled data and initial ood data are in correct ratio
                 U_index = list(set(L_total + O_total) - set(L_index) - set(O_index))
                 if args.method == 'EPIG':
                     print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(len(L_index), len(O_index), len(U_index) - int(args.n_class) * args.target_per_class))
@@ -347,7 +373,10 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
                     print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(len(L_index), len(O_index), len(U_index)))
             else:
                 ood_rate = 0
-                L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
+                if args.dataset in ['AGNEWS']:
+                    L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
+                else:
+                    L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
                 O_total = []
                 n_ood = 0
                 print("# Total in: {}, ood: {}".format(len(L_total), len(O_total)))
@@ -380,7 +409,10 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
         return L_index, O_index, U_index
     else:
         Q_index = list(Q_index)
-        Q_label = [dataset[i][1] for i in Q_index]
+        if args.dataset in ['AGNEWS']:
+            Q_label = [dataset[i]['index']for i in Q_index]
+        else:
+            Q_label = [dataset[i][1] for i in Q_index]
 
         in_Q_index, ood_Q_index = [], []
         for i, c in enumerate(Q_label):
@@ -403,4 +435,6 @@ def get_sub_test_dataset(args, dataset):
         labeled_index = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
     elif args.dataset == 'ImageNet50' or args.dataset == 'TinyImageNet':
         labeled_index = [dataset[i][2] for i in args.in_test_indices]
+    if args.dataset in ['AGNEWS']:
+        labeled_index = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]    
     return labeled_index

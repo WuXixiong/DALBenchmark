@@ -7,3 +7,4 @@ from .mnist import *
 #from .qmnist import *
 from .svhn import *
 from .tinyimagenet import *
+from .agnews import *

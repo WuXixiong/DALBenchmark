@@ -19,6 +19,7 @@ class Uncertainty(ALMethod):
         return selection_result, scores
 
     def rank_uncertainty(self):
+        self.models['backbone'] = self.models['backbone'].to(self.args.device)
         self.models['backbone'].eval()
         selection_loader = torch.utils.data.DataLoader(self.unlabeled_set, batch_size=self.args.test_batch_size, num_workers=self.args.workers)
 
@@ -26,7 +27,15 @@ class Uncertainty(ALMethod):
         batch_num = len(selection_loader)
         print("| Calculating uncertainty of Unlabeled set")
         for i, data in enumerate(selection_loader):
-            inputs = data[0].to(self.args.device)
+            if self.args.dataset in ['AGNEWS']:
+                # Extract input_ids, attention_mask, and labels from the dictionary
+                input_ids = data['input_ids'].to(self.args.device)
+                attention_mask = data['attention_mask'].to(self.args.device)
+                # labels = data['labels'].to(self.args.device)
+            else:
+                inputs = data[0].to(self.args.device)
+
+
             if i % self.args.print_freq == 0:
                 print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
 
@@ -45,7 +54,11 @@ class Uncertainty(ALMethod):
                         confs = preds.max(axis=1).values.cpu().numpy()
                         scores = np.append(scores, confs)
                     elif self.selection_method == "Entropy":
-                        preds, _ = self.models['backbone'](inputs)
+                        if self.args.dataset in ['AGNEWS']:
+                            preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                            preds = preds.logits  # Extract logits for AGNEWS
+                        else:
+                            preds, _ = self.models['backbone'](inputs)
                         preds = torch.nn.functional.softmax(preds, dim=1).cpu().numpy()
                         entropys = (np.log(preds + 1e-6) * preds).sum(axis=1)
                         scores = np.append(scores, entropys)

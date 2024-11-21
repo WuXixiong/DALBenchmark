@@ -1,7 +1,7 @@
 from torchvision import datasets
 from torch.utils.data import Dataset, Subset
 import numpy as np
-from arguments import parser  # Assuming parser is defined in the arguments module
+from arguments import parser
 
 import random
 import torch
