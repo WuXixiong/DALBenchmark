@@ -3,7 +3,7 @@ This is the code implementation for Chenkai Wu's honours project (Deep Active Le
 Active learning (AL) attempts to measure the value of data, selecting only the most valuable portion for labeling to reduce labeling costs. While deep active learning (DAL) combines deep learning and active learning, aiming to maintain good performance of Deep Learning models with as little data as possible.
 
 <p align="center">
-<img src="dal.png" width="700"> 
+<img src="pictures/dal.png" width="700"> 
 </p>
 
 
@@ -12,14 +12,14 @@ In this honours project, we designed a new platform for DAL which can help resea
 This platform is built on a modular structure, making it easy to modify and add new algorithms and tasks, laying a solid foundation for further expansion in the future.
 
 <p align="center">
-<img src="modules.png" width="700"> 
+<img src="pictures/modules.png" width="700"> 
 </p>
 
 This platform also includes 21 DAL algorithms, eight of which are the latest (introduced in 2022 or later). Among these, two algorithms address open-set scenarios, and two handle imbalanced-sets.
 
 <div style="display: flex; justify-content: space-between;">
-    <img src="algorithms.png" width="650">
-    <img src="classAlgorithm.png" width="650">
+    <img src="pictures/algorithms.png" width="650">
+    <img src="pictures/classAlgorithm.png" width="650">
 </div>
 
 Finally, we extend our sincere gratitude to the authors of previous DAL algorithms and platforms. These prior contributions have greatly benefited this honors project.
