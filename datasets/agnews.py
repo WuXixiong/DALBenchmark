@@ -1,5 +1,4 @@
 from torch.utils.data import Dataset
-from transformers import BertTokenizer
 from torchtext.datasets import AG_NEWS
 import numpy as np
 import torch
@@ -54,6 +53,7 @@ class MyAGNewsDataset(Dataset):
             'labels': torch.tensor(label, dtype=torch.long),
             'index': index  # Return the sample index
         }
+    # return data, target, index
 
     def __len__(self):
         """

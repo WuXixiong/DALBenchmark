@@ -793,7 +793,7 @@ def train(args, models, criterion, optimizers, schedulers, dataloaders, criterio
     log_dir = f'logs/tensorboard/{args.method}_experiment'
     writer = SummaryWriter(log_dir=log_dir)
 
-    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'CCAL', 'SIMILAR', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL']:  # add new methods like VAAL
+    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'CCAL', 'SIMILAR', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'Corelog']:  # add new methods like VAAL
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
             if args.dataset in ['AGNEWS']:
                 epoch_loss, epoch_accuracy = train_epoch_nlp(args, models, criterion, optimizers, dataloaders, writer, epoch)
@@ -1027,10 +1027,10 @@ def get_more_args(args):
 
 def get_models(args, nets, model, models):
     # Normal
-    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL']: # add new methods
+    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'Corelog']: # add new methods
         if args.dataset in ['AGNEWS']:
-            from transformers import BertForSequenceClassification
-            backbone = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=4)
+            from transformers import DistilBertForSequenceClassification
+            backbone = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=4)
         else:
             backbone = nets.__dict__[model](args.channel, args.num_IN_class, args.im_size).to(args.device)
         if args.device == "cpu":
@@ -1172,6 +1172,8 @@ def get_optim_configurations(args, models):
             if args.method == 'EOAL':
                 params_bc = list(models['model_bc'].parameters())
                 optim_C = torch.optim.SGD(params_bc, lr=args.lr_model, momentum=0.9, weight_decay=0.0005, nesterov=True)
+    elif args.optimizer == "AdamW":
+        optimizer = torch.optim.AdamW(models['backbone'].parameters(), args.lr, weight_decay=args.weight_decay)
     else:
         optimizer = torch.optim.__dict__[args.optimizer](models['backbone'].parameters(), args.lr, momentum=args.momentum,
                                                          weight_decay=args.weight_decay)
@@ -1201,7 +1203,7 @@ def get_optim_configurations(args, models):
             scheduler_ood = torch.optim.lr_scheduler.__dict__[args.scheduler](optimizer_ood)
 
     # Normal
-    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL']: # also add new methods
+    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'Corelog']: # also add new methods
         optimizers = {'backbone': optimizer}
         schedulers = {'backbone': scheduler}
 

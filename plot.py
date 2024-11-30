@@ -33,7 +33,7 @@ def extract_test_accuracy(file_path):
     return cycles, test_accuracies, query_datas
 
 # Directory containing your log files
-log_dir = 'logs/SVHN/200'
+log_dir = 'logs/AGNEWS/50'
 
 # Dictionary to store results for each method
 methods = {
@@ -130,6 +130,10 @@ final_accuracy_results = {}
 
 final_accuracys = {}
 all_aubc = {}
+
+print(methods)
+
+
 # Plot for each method
 for method, data in methods.items():
     if data['test_accuracies']:  # Ensure there's data for the method

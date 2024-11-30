@@ -178,7 +178,7 @@ if __name__ == '__main__':
                 dataloaders['train'] = train_loader
 
             # Log cycle information
-            log_cycle_info(logs, cycle, acc, in_cnt, Q_classes)
+            log_cycle_info(logs, cycle, acc, in_cnt, class_counts)
 
         # Save logs after all cycles
         save_logs(logs, args, trial)

@@ -13,7 +13,7 @@ from datasets.svhn import MySVHN
 from datasets.agnews import MyAGNewsDataset
 from torchvision import datasets
 import torchvision.transforms as T
-from transformers import BertTokenizer
+from transformers import DistilBertTokenizer
 import os
 
 CIFAR10_SUPERCLASS = list(range(10))  # one class
@@ -142,7 +142,7 @@ def get_dataset(args, trial):
         test_set = MyTinyImageNet(file_path + 'val/', transform=test_transform)
     elif args.dataset == 'AGNEWS':
         # Load the AGNEWS dataset
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')  # Use a pre-trained tokenizer
+        tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')  # Use a pre-trained tokenizer
         file_path = args.data_path + '/agnews/'  # Adjust the path if necessary
         
         # Initialize datasets for training, validation, and testing
@@ -410,7 +410,7 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
     else:
         Q_index = list(Q_index)
         if args.dataset in ['AGNEWS']:
-            Q_label = [dataset[i]['index']for i in Q_index]
+            Q_label = [dataset[i]['labels']for i in Q_index]
         else:
             Q_label = [dataset[i][1] for i in Q_index]
 
@@ -419,6 +419,8 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
             if c < len(classes):
                 in_Q_index.append(Q_index[i])
             else:
+                print('current so-called ood is')
+                print(c)
                 ood_Q_index.append(Q_index[i])
         print("# query in: {}, ood: {}".format(len(in_Q_index), len(ood_Q_index)))
 

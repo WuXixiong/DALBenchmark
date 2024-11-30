@@ -50,7 +50,11 @@ class Uncertainty(ALMethod):
             else:
                 with torch.no_grad():
                     if self.selection_method == "CONF":
-                        preds, _ = self.models['backbone'](inputs)
+                        if self.args.dataset in ['AGNEWS']:
+                            preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                            preds = preds.logits  # Extract logits for AGNEWS
+                        else:
+                            preds, _ = self.models['backbone'](inputs)
                         confs = preds.max(axis=1).values.cpu().numpy()
                         scores = np.append(scores, confs)
                     elif self.selection_method == "Entropy":
@@ -63,7 +67,11 @@ class Uncertainty(ALMethod):
                         entropys = (np.log(preds + 1e-6) * preds).sum(axis=1)
                         scores = np.append(scores, entropys)
                     elif self.selection_method == "Margin":
-                        preds, _ = self.models['backbone'](inputs)
+                        if self.args.dataset in ['AGNEWS']:
+                            preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                            preds = preds.logits  # Extract logits for AGNEWS
+                        else:
+                            preds, _ = self.models['backbone'](inputs)
                         preds = torch.nn.functional.softmax(preds, dim=1)
                         preds_argmax = torch.argmax(preds, dim=1)
                         max_preds = preds[torch.ones(preds.shape[0], dtype=bool), preds_argmax].clone()
@@ -72,7 +80,11 @@ class Uncertainty(ALMethod):
                         margins = (max_preds - preds[torch.ones(preds.shape[0], dtype=bool), preds_sub_argmax]).cpu().numpy()
                         scores = np.append(scores, margins)
                     elif self.selection_method == "VarRatio":
-                        preds, _ = self.models['backbone'](inputs)
+                        if self.args.dataset in ['AGNEWS']:
+                            preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                            preds = preds.logits  # Extract logits for AGNEWS
+                        else:
+                            preds, _ = self.models['backbone'](inputs)
                         preds = torch.nn.functional.softmax(preds, dim=1)
                         preds = torch.max(preds, 1)[0]
                         uncertainties = 1.0 - preds
