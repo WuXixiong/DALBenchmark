@@ -1033,9 +1033,9 @@ def get_models(args, nets, model, models):
     # text dataset
     if args.model in ['DistilBert', 'Roberta']:
         if args.model == 'DistilBert':
-            backbone = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=args.n_class)
+            backbone = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=int(args.n_class))
         elif args.model == 'Roberta':
-            backbone = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=args.n_class)
+            backbone = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=int(args.n_class))
         models = {'backbone': backbone}
         return models
 
