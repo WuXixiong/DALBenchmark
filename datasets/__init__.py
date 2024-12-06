@@ -8,3 +8,4 @@ from .mnist import *
 from .svhn import *
 from .tinyimagenet import *
 from .agnews import *
+from .imdb import *

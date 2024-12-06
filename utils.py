@@ -1026,13 +1026,16 @@ def get_more_args(args):
     return args
 
 def get_models(args, nets, model, models):
+    # text dataset
+    if args.model in ['DistilBert']:
+        from transformers import DistilBertForSequenceClassification
+        backbone = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=args.n_class)
+        models = {'backbone': backbone}
+        return models
+
     # Normal
     if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'Corelog']: # add new methods
-        if args.dataset in ['AGNEWS']:
-            from transformers import DistilBertForSequenceClassification
-            backbone = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=4)
-        else:
-            backbone = nets.__dict__[model](args.channel, args.num_IN_class, args.im_size).to(args.device)
+        backbone = nets.__dict__[model](args.channel, args.num_IN_class, args.im_size).to(args.device)
         if args.device == "cpu":
             print("Using CPU.")
         elif args.data_parallel == True:

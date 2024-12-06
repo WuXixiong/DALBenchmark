@@ -41,11 +41,15 @@ Finally, we extend our sincere gratitude to the authors of previous DAL algorith
    - This step can be completed using the `requirements.txt` file provided by the platform via `pip`.
      * `pip install -r requirements.txt`
 
-3. Install the Final Dependency: submodlib
-   - For this step, I recommend using the "Alternative 2" method provided by the submodlib [GitHub repository](https://github.com/decile-team/submodlib).
+3. Install the Final Dependencies: `torchlars` and `submodlib`
+   - Since installing `torchlars` requires `torch` to be installed beforehand, it is necessary to run this command after executing `pip install -r requirements.txt`; otherwise, it will return an error.  
+     * `pip install torchlars==0.1.2`
+   - For installing `submodlib`, I recommend using the "Alternative 2" method provided by the submodlib [GitHub repository](https://github.com/decile-team/submodlib).
      * `git clone https://github.com/decile-team/submodlib.git`
      * `cd submodlib`
      * `pip install .`
+     * `cd ..`
+     * (optional, since submodlib has been installed) `rm -rf submodlib`
 
 ### References
 
