@@ -14,7 +14,9 @@ from datasets.agnews import MyAGNewsDataset
 from torchvision import datasets
 import torchvision.transforms as T
 from transformers import DistilBertTokenizer
+from transformers import RobertaTokenizer
 import os
+from tqdm import tqdm
 
 CIFAR10_SUPERCLASS = list(range(10))  # one class
 CIFAR100_SUPERCLASS = [
@@ -142,7 +144,10 @@ def get_dataset(args, trial):
         test_set = MyTinyImageNet(file_path + 'val/', transform=test_transform)
     elif args.dataset == 'AGNEWS':
         # Load the AGNEWS dataset
-        tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')  # Use a pre-trained tokenizer
+        if args.model == 'DistilBert':
+            tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')  # Use a pre-trained tokenizer
+        elif args.model == 'Roberta':
+            tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
         file_path = args.data_path + '/agnews/'  # Adjust the path if necessary
         
         # Initialize datasets for training, validation, and testing
@@ -274,13 +279,6 @@ def get_dataset(args, trial):
                 else:
                     # 如果索引不在 in_test_indices 中，标记为 OOD
                     test_set.targets[idx] = int(args.num_IN_class)
-            
-            # unique_targets = set(test_set.targets)
-            # print("Unique targets in test_set:", unique_targets)
-            # print("Keys in class_covert_dict:", set(class_covert_dict.keys()))
-
-            # for i, idx in enumerate(args.in_test_indices):
-            #     test_set.targets[idx] = class_covert_dict[test_set.targets[idx]]
 
     unlabeled_set.targets = train_set.targets
 
@@ -309,9 +307,6 @@ def get_dataset(args, trial):
         uni, cnt = np.unique(np.array(test_set.targets[args.in_test_indices]), return_counts=True)
         print("Test, # samples per class")
         print(uni, cnt)
-
-    # if args.method == 'EPIG':
-    #     return train_set, unlabeled_set, test_set, targetset_index
     
     return train_set, unlabeled_set, test_set
 

@@ -1,6 +1,7 @@
 from .almethod import ALMethod
 import torch
 import numpy as np
+from tqdm import tqdm
 
 class Uncertainty(ALMethod):
     def __init__(self, args, models, unlabeled_dst, U_index, selection_method="CONF", **kwargs):
@@ -26,7 +27,7 @@ class Uncertainty(ALMethod):
         scores = np.array([])
         batch_num = len(selection_loader)
         print("| Calculating uncertainty of Unlabeled set")
-        for i, data in enumerate(selection_loader):
+        for i, data in tqdm(enumerate(selection_loader), total=batch_num):
             if self.args.dataset in ['AGNEWS']:
                 # Extract input_ids, attention_mask, and labels from the dictionary
                 input_ids = data['input_ids'].to(self.args.device)
@@ -34,10 +35,6 @@ class Uncertainty(ALMethod):
                 # labels = data['labels'].to(self.args.device)
             else:
                 inputs = data[0].to(self.args.device)
-
-
-            if i % self.args.print_freq == 0:
-                print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
 
             if self.selection_method == "AdversarialBIM":
                 self.models['backbone'].train()
