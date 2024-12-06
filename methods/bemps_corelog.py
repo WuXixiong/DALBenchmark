@@ -20,7 +20,9 @@ class Corelog(ALMethod):
 
     def run(self):
         scores = self.rank_uncertainty()
-        selection_result = np.argsort(scores)[:self.args.n_query]
+        print('the shape of scores is')
+        print(scores.shape)
+        selection_result = np.argsort(scores.cpu().numpy())[:self.args.n_query]
         return selection_result, scores
 
     def rank_uncertainty(self):
