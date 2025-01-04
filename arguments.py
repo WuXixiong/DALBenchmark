@@ -9,6 +9,8 @@ parser = argparse.ArgumentParser(description='Parameter Processing')
 parser.add_argument("--num-IN-class", type=int, default=100, help="how many classes are in domain")
 parser.add_argument("--init_dist", type=str, default='random',
                     help="uniform / random.")
+parser.add_argument("--chunk_size", type=int, default=10,
+                    help="divide dataset into chunk_size parts")
 # PAL
 parser.add_argument('--wdecay', default=5e-4, type=float,help='weight decay')
 parser.add_argument('--use-ema',  action='store_true', default=True, help='use EMA model')
