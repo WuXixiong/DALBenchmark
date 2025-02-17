@@ -16,7 +16,7 @@ class AlphaMixSampling(ALMethod):
 		self.I_index = I_index
 		self.labeled_set = torch.utils.data.Subset(unlabeled_dst, I_index)
 		self.fc2 = None
-        # subset selection (for diversity)
+		# subset settings
 		subset_idx = np.random.choice(len(self.U_index), size=(min(self.args.subset, len(self.U_index)),), replace=False)
 		self.U_index_sub = np.array(self.U_index)[subset_idx]
 

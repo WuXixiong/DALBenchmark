@@ -133,7 +133,7 @@ def get_dataset(args, trial):
             class_indice_dict = pickle.load(f)
             #class_indice_dict['ood_indices'] = list(np.setdiff1d(list(range(0, len(train_set))), class_indice_dict['in_indices']))
         print(class_indice_dict.keys()) #['in_class', 'in_indices', 'in_indices_test', 'ood_indices']
-        # 检查每个类的样本数
+        # check the number of samples in each class
         # for class_id, indices in class_indice_dict.items():
         #     print(f"Class {class_id}: {len(indices)} samples")
 
