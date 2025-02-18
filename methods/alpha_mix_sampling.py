@@ -36,7 +36,13 @@ class AlphaMixSampling(ALMethod):
 		org_ulb_embedding = None
 		print("| Calculating uncertainty of Unlabeled set")
 		for i, data in enumerate(selection_loader):
-			inputs = data[0].to(self.args.device)
+			if self.args.dataset in ['AGNEWS', 'IMDB']:
+			# Extract input_ids, attention_mask, and labels from the dictionary
+				input_ids = data['input_ids'].to(self.args.device)
+				attention_mask = data['attention_mask'].to(self.args.device)
+                # labels = data['labels'].to(self.args.device)
+			else:
+				inputs = data[0].to(self.args.device)
 			if i % self.args.print_freq == 0:
 				print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
 				with torch.no_grad():

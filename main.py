@@ -113,9 +113,10 @@ if __name__ == '__main__':
             train(args, models, criterion, optimizers, schedulers, dataloaders, criterion_xent, criterion_cent, optimizer_centloss, O_index, cluster_centers, cluster_labels, cluster_indices, wnet, optimizer_wnet)
             print("cycle: {}, elapsed time: {}".format(cycle, (time.time() - t)))
 
-            # Test
+            # Test for texts
             if args.dataset in ['AGNEWS', 'IMDB']:
                 acc = test_nlp(args, models, dataloaders)
+            # Test for images
             else:
                 acc = test(args, models, dataloaders)
 
@@ -144,10 +145,11 @@ if __name__ == '__main__':
 
             # get query data class
             if args.dataset in ['AGNEWS', 'IMDB']:
-                Q_classes = [train_dst[idx]['labels'] for idx in Q_index]
+                Q_classes = [train_dst[idx]['labels'].item() for idx in Q_index]
             else:
                 Q_classes = [train_dst[idx][1] for idx in Q_index]
             class_counts = Counter(Q_classes)
+            print("Query class distribution: ", class_counts)
 
             # Update Indices
             I_index, O_index, U_index, in_cnt = get_sub_train_dataset(args, train_dst, I_index, O_index, U_index, Q_index, initial=False)

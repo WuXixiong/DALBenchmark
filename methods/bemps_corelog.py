@@ -198,28 +198,66 @@ class Corelog(ALMethod):
         return Q_index, scores
 
     def predict_prob_dropout_split(self, to_predict_dataset, to_predict_dataloader, n_drop):
+
+        # self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # Ensure model is on right device and is in TRAIN mode.
+        # Train mode is needed to activate randomness in dropout modules.
         self.models['backbone'].train()
         self.models['backbone'] = self.models['backbone'].to(self.args.device)
 
-        probs = torch.zeros([n_drop, len(to_predict_dataset), len(self.args.target_list)], device=self.args.device)
+        # Create a tensor to hold probabilities
+        probs = torch.zeros([n_drop, len(to_predict_dataset), len(self.args.target_list)]).to(self.args.device)
+
+        # Create a dataloader object to load the dataset
+        # to_predict_dataloader = torch.utils.data.DataLoader(to_predict_dataset, batch_size=self.args['batch_size'], shuffle=False)
 
         with torch.no_grad():
+            # Repeat n_drop number of times to obtain n_drop dropout samples per data instance
             print('Processing model dropout...')
             for i in tqdm(range(n_drop)):
+
                 evaluated_instances = 0
-                for _, data in enumerate(to_predict_dataloader):
-                    input_ids = data['input_ids'].to(self.args.device)
-                    attention_mask = data['attention_mask'].to(self.args.device)
-                    preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask).logits
-                    # 将logits转换为概率分布
-                    pred_probs = softmax(preds, dim=-1)
-                    batch_size = input_ids.size(0)
+                # for i, data in enumerate(selection_loader):
+                # inputs = data[0].to(self.args.device)
+                for _, elements_to_predict in enumerate(to_predict_dataloader):
+                    # Calculate softmax (probabilities) of predictions
+                    elements_to_predict = elements_to_predict[0].to(self.args.device)
+                    out = self.models['backbone'](elements_to_predict)[0]
+                    # print(out)
+                    pred = torch.nn.functional.softmax(out, dim=1)
+
+                    # Accumulate the calculated batch of probabilities into the tensor to return
                     start_slice = evaluated_instances
-                    end_slice = start_slice + batch_size
-                    probs[i][start_slice:end_slice] = pred_probs
+                    end_slice = start_slice + elements_to_predict.shape[0]
+                    probs[i][start_slice:end_slice] = pred
                     evaluated_instances = end_slice
 
         return probs
+    
+    # def predict_prob_dropout_split(self, to_predict_dataset, to_predict_dataloader, n_drop):
+    #     self.models['backbone'].train()
+    #     self.models['backbone'] = self.models['backbone'].to(self.args.device)
+
+    #     probs = torch.zeros([n_drop, len(to_predict_dataset), len(self.args.target_list)], device=self.args.device)
+
+    #     with torch.no_grad():
+    #         print('Processing model dropout...')
+    #         for i in tqdm(range(n_drop)):
+    #             evaluated_instances = 0
+    #             for _, data in enumerate(to_predict_dataloader):
+    #                 input_ids = data['input_ids'].to(self.args.device)
+    #                 attention_mask = data['attention_mask'].to(self.args.device)
+    #                 preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask).logits
+    #                 # 将logits转换为概率分布
+    #                 pred_probs = softmax(preds, dim=-1)
+    #                 batch_size = input_ids.size(0)
+    #                 start_slice = evaluated_instances
+    #                 end_slice = start_slice + batch_size
+    #                 probs[i][start_slice:end_slice] = pred_probs
+    #                 evaluated_instances = end_slice
+
+    #     return probs
 
 def random_generator_for_x_prime(x_dim, size):
     num_to_sample = max(round(x_dim * size), 1)

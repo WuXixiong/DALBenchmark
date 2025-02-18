@@ -60,12 +60,12 @@ def save_logs(logs, args, trial):
                 entry_main = entry[:-1]
                 queried_classes = entry[-1]
                 queried_classes_str = ', '.join([f'{k}: {v}' for k, v in queried_classes.items()])
-                file.write('|'.join(str(x) for x in entry_main) + f'| {queried_classes_str}\n')
+                file.write(' | '.join(str(x) for x in entry_main) + f' | {queried_classes_str}\n')
             elif all(isinstance(sub, list) for sub in entry):
                 for sub_entry in entry:
                     if all(isinstance(x, (int, float)) for x in sub_entry):
-                        file.write('|'.join(f'{x:.4f}' for x in sub_entry) + '\n')
+                        file.write(' | '.join(f'{x:.4f}' for x in sub_entry) + '\n')
                     else:
-                        file.write('|'.join(str(x) for x in sub_entry) + '\n')
+                        file.write(' | '.join(str(x) for x in sub_entry) + '\n')
             else:
                 file.write(' '.join(str(x) for x in entry) + '\n')

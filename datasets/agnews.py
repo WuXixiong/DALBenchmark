@@ -46,7 +46,8 @@ class MyAGNewsDataset(Dataset):
             return_attention_mask=True,
             return_tensors='pt',
         )
-        
+
+        # return (encoding['input_ids'].flatten(), encoding['attention_mask'].flatten()),torch.tensor(label, dtype=torch.long),index 
         return {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),

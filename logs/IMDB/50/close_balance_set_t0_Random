@@ -1,0 +1,17 @@
+This experiment time is:
+2025-02-19 10:25:48
+Experiment settings:
+AL method:Random
+Dataset:IMDB
+Model random seed:0
+Backbone:DistilBert
+Optimizer:AdamW
+Learning rate:0.0001
+Weight decay:0.0005
+Gamma value for StepLR:0.5
+Step size for StepLR:50
+Number of total epochs each cycle:200
+Initial training set size:50
+Cycle |  Test Accuracy |  Number of in-domain query data |  Queried Classes
+1 | 95.86842426500823 | 50 | 0: 26, 1: 24
+2 | 96.00000020077354 | 50 | 0: 20, 1: 30
