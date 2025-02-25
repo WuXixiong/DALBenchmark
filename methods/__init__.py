@@ -22,3 +22,4 @@ from .vessal import *
 from .pal import *
 
 from .bemps_corelog import *
+from .bemps_coremse import *

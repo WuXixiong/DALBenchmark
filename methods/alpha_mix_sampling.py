@@ -36,7 +36,7 @@ class AlphaMixSampling(ALMethod):
 		org_ulb_embedding = None
 		print("| Calculating uncertainty of Unlabeled set")
 		for i, data in enumerate(selection_loader):
-			if self.args.dataset in ['AGNEWS', 'IMDB']:
+			if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
 			# Extract input_ids, attention_mask, and labels from the dictionary
 				input_ids = data['input_ids'].to(self.args.device)
 				attention_mask = data['attention_mask'].to(self.args.device)

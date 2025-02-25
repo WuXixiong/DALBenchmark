@@ -11,6 +11,8 @@ from datasets.imagenet import MyImageNet
 from datasets.mnist import MyMNIST
 from datasets.svhn import MySVHN
 from datasets.agnews import MyAGNewsDataset
+from datasets.imdb import MyIMDBDataset
+from datasets.sst5 import MySST5Dataset
 from torchvision import datasets
 import torchvision.transforms as T
 from transformers import DistilBertTokenizer
@@ -142,7 +144,7 @@ def get_dataset(args, trial):
         train_set = MyTinyImageNet(file_path + 'train/', transform=train_transform)
         unlabeled_set = MyTinyImageNet(file_path + 'train/', transform=test_transform)
         test_set = MyTinyImageNet(file_path + 'val/', transform=test_transform)
-    elif args.dataset in ['AGNEWS', 'IMDB']:
+    elif args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
         # Load the AGNEWS dataset
         if args.model == 'DistilBert':
             tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')  # Use a pre-trained tokenizer
@@ -151,9 +153,21 @@ def get_dataset(args, trial):
         # file_path = args.data_path + '/agnews/'  # Adjust the path if necessary
         
         # Initialize datasets for training, validation, and testing
-        train_set = MyAGNewsDataset(split='train', tokenizer=tokenizer, max_length=128)
-        test_set = MyAGNewsDataset(split='test', tokenizer=tokenizer, max_length=128)
-        unlabeled_set = MyAGNewsDataset(split='train', tokenizer=tokenizer, max_length=128)
+        if args.dataset == 'SST5':
+            file_path = args.data_path + '/sst5/'
+            # train_set = MySST5Dataset(file_path+'train.tsv', tokenizer=file_path+'cached_train_distilbert-base-uncased_128_sst5', max_length=128)
+            # test_set = MySST5Dataset(file_path+'test.tsv', tokenizer=file_path+'cached_test_distilbert-base-uncased_128_sst5', max_length=128)
+            train_set = MySST5Dataset(file_path+'train.tsv', tokenizer=tokenizer, max_length=128)
+            test_set = MySST5Dataset(file_path+'test.tsv', tokenizer=tokenizer, max_length=128)
+            unlabeled_set = MySST5Dataset(file_path+'train.tsv', tokenizer=tokenizer, max_length=128)
+        elif args.dataset == 'IMDB':
+            train_set = MyIMDBDataset(split='train', tokenizer=tokenizer, max_length=128)
+            test_set = MyIMDBDataset(split='test', tokenizer=tokenizer, max_length=128)
+            unlabeled_set = MyIMDBDataset(split='train', tokenizer=tokenizer, max_length=128)
+        else: # agnews
+            train_set = MyAGNewsDataset(split='train', tokenizer=tokenizer, max_length=128)
+            test_set = MyAGNewsDataset(split='test', tokenizer=tokenizer, max_length=128)
+            unlabeled_set = MyAGNewsDataset(split='train', tokenizer=tokenizer, max_length=128)
 
     # class-split
     if args.dataset in ['CIFAR10', 'SVHN']:
@@ -181,6 +195,23 @@ def get_dataset(args, trial):
 
         # Define untarget_list as the complement of target_list
         args.untarget_list = list(np.setdiff1d(list(range(4)), list(args.target_list)))
+    
+    if args.dataset == 'SST5':
+        args.input_size = 128  # 根据需要调整
+        args.target_list = list(range(5))  # SST-5 有 5 个类别
+        args.num_IN_class = 5  # 类别数量
+        if args.openset:
+            # 定义不同的类别组合
+            args.target_lists = [
+                [0, 1], [0, 2], [0, 3], [0, 4],
+                [1, 2], [1, 3], [1, 4],
+                [2, 3], [2, 4],
+                [3, 4]
+            ]
+            args.target_list = args.target_lists[trial]  # 根据试验编号选择组合
+            args.num_IN_class = len(args.target_list)  # 更新类别数量
+        # 计算未目标类别列表
+    args.untarget_list = list(set(range(5)) - set(args.target_list))
 
     if args.dataset == 'IMDB':
         # Define input size, number of classes, and initial class list
@@ -250,7 +281,7 @@ def get_dataset(args, trial):
 
 
     # class converting
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB']: # add mnist
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB','SST5']: # add mnist
         for i, c in enumerate(args.untarget_list):
             train_set.targets[np.where(train_set.targets == c)[0]] = int(args.n_class)
             test_set.targets[np.where(test_set.targets == c)[0]] = int(args.n_class)
@@ -354,9 +385,9 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
     ood_rate = args.ood_rate
 
     if initial:
-        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB']:
+        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5']:
             if args.openset:
-                if args.dataset in ['AGNEWS', 'IMDB']:
+                if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                     L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
                     O_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] >= len(classes)]
                 else:
@@ -384,7 +415,7 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
                     print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(len(L_index), len(O_index), len(U_index)))
             else:
                 ood_rate = 0
-                if args.dataset in ['AGNEWS', 'IMDB']:
+                if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                     L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
                 else:
                     L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
@@ -420,7 +451,7 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
         return L_index, O_index, U_index
     else:
         Q_index = list(Q_index)
-        if args.dataset in ['AGNEWS', 'IMDB']:
+        if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
             Q_label = [dataset[i]['labels']for i in Q_index]
         else:
             Q_label = [dataset[i][1] for i in Q_index]
@@ -448,6 +479,6 @@ def get_sub_test_dataset(args, dataset):
         labeled_index = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
     elif args.dataset == 'ImageNet50' or args.dataset == 'TinyImageNet':
         labeled_index = [dataset[i][2] for i in args.in_test_indices]
-    if args.dataset in ['AGNEWS', 'IMDB']:
+    if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
         labeled_index = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]    
     return labeled_index

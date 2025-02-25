@@ -28,7 +28,7 @@ class Uncertainty(ALMethod):
         batch_num = len(selection_loader)
         print("| Calculating uncertainty of Unlabeled set")
         for i, data in tqdm(enumerate(selection_loader), total=batch_num):
-            if self.args.dataset in ['AGNEWS', 'IMDB']:
+            if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                 # Extract input_ids, attention_mask, and labels from the dictionary
                 input_ids = data['input_ids'].to(self.args.device)
                 attention_mask = data['attention_mask'].to(self.args.device)
@@ -47,7 +47,7 @@ class Uncertainty(ALMethod):
             else:
                 with torch.no_grad():
                     if self.selection_method == "CONF":
-                        if self.args.dataset in ['AGNEWS', 'IMDB']:
+                        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                             preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
                             preds = preds.logits  # Extract logits for AGNEWS
                         else:
@@ -55,7 +55,7 @@ class Uncertainty(ALMethod):
                         confs = preds.max(axis=1).values.cpu().numpy()
                         scores = np.append(scores, confs)
                     elif self.selection_method == "Entropy":
-                        if self.args.dataset in ['AGNEWS', 'IMDB']:
+                        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                             preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
                             preds = preds.logits  # Extract logits for AGNEWS
                         else:
@@ -64,7 +64,7 @@ class Uncertainty(ALMethod):
                         entropys = (np.log(preds + 1e-6) * preds).sum(axis=1)
                         scores = np.append(scores, entropys)
                     elif self.selection_method == "Margin":
-                        if self.args.dataset in ['AGNEWS', 'IMDB']:
+                        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                             preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
                             preds = preds.logits  # Extract logits for AGNEWS
                         else:
@@ -77,7 +77,7 @@ class Uncertainty(ALMethod):
                         margins = (max_preds - preds[torch.ones(preds.shape[0], dtype=bool), preds_sub_argmax]).cpu().numpy()
                         scores = np.append(scores, margins)
                     elif self.selection_method == "VarRatio":
-                        if self.args.dataset in ['AGNEWS', 'IMDB']:
+                        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                             preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
                             preds = preds.logits  # Extract logits for AGNEWS
                         else:

@@ -797,9 +797,9 @@ def train(args, models, criterion, optimizers, schedulers, dataloaders, criterio
     log_dir = f'logs/tensorboard/{args.method}_experiment'
     writer = SummaryWriter(log_dir=log_dir)
 
-    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'CCAL', 'SIMILAR', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'Corelog']:  # add new methods like VAAL
+    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'CCAL', 'SIMILAR', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'corelog', 'coremse']:  # add new methods like VAAL
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
-            if args.dataset in ['AGNEWS', 'IMDB']:
+            if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                 epoch_loss, epoch_accuracy = train_epoch_nlp(args, models, criterion, optimizers, dataloaders, writer, epoch)
             else:
                 epoch_loss, epoch_accuracy = train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch)
@@ -1040,7 +1040,7 @@ def get_models(args, nets, model, models):
         return models
 
     # Normal
-    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'Corelog']: # add new methods
+    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'corelog', 'coremse']: # add new methods
         backbone = nets.__dict__[model](args.channel, args.num_IN_class, args.im_size).to(args.device)
         if args.device == "cpu":
             print("Using CPU.")
@@ -1212,7 +1212,7 @@ def get_optim_configurations(args, models):
             scheduler_ood = torch.optim.lr_scheduler.__dict__[args.scheduler](optimizer_ood)
 
     # Normal
-    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'Corelog']: # also add new methods
+    if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'corelog', 'coremse']: # also add new methods
         optimizers = {'backbone': optimizer}
         schedulers = {'backbone': scheduler}
 

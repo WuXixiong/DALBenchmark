@@ -47,7 +47,7 @@ if __name__ == '__main__':
         test_I_index = get_sub_test_dataset(args, test_dst)
 
         # DataLoaders
-        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB']: # ADD MNIST
+        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5']: # ADD MNIST
             sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
             sampler_test = SubsetSequentialSampler(test_I_index)
             train_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
@@ -114,7 +114,7 @@ if __name__ == '__main__':
             print("cycle: {}, elapsed time: {}".format(cycle, (time.time() - t)))
 
             # Test for texts
-            if args.dataset in ['AGNEWS', 'IMDB']:
+            if args.dataset in ['AGNEWS', 'IMDB' , 'SST5']:
                 acc = test_nlp(args, models, dataloaders)
             # Test for images
             else:
@@ -144,12 +144,11 @@ if __name__ == '__main__':
             Q_index, Q_scores = ALmethod.select()
 
             # get query data class
-            if args.dataset in ['AGNEWS', 'IMDB']:
+            if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
                 Q_classes = [train_dst[idx]['labels'].item() for idx in Q_index]
             else:
                 Q_classes = [train_dst[idx][1] for idx in Q_index]
             class_counts = Counter(Q_classes)
-            print("Query class distribution: ", class_counts)
 
             # Update Indices
             I_index, O_index, U_index, in_cnt = get_sub_train_dataset(args, train_dst, I_index, O_index, U_index, Q_index, initial=False)
@@ -165,7 +164,7 @@ if __name__ == '__main__':
                 models = meta_train(args, models, optimizers, schedulers, criterion, dataloaders['train'], unlabeled_loader, delta_loader)
 
             # Update trainloader
-            if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB']:
+            if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5']:
                 sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
                 dataloaders['train'] = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
                 if args.method in ['LFOSA', 'EOAL', 'PAL']:

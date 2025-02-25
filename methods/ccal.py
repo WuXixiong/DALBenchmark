@@ -14,10 +14,16 @@ class CCAL(ALMethod):
     def get_label_i_loader(self):
         # Measure uncertainty of each utils points in the subset
         label_i_index = [[] for i in range(self.args.num_IN_class)]
-        for i in self.I_index:
-            for k in range(self.args.num_IN_class):
-                if self.unlabeled_dst[i][1] == k:
-                    label_i_index[k].append(i)
+        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            for i in self.I_index:
+                for k in range(self.args.num_IN_class):
+                    if self.unlabeled_dst[i]["labels"].item() == k: # label
+                        label_i_index[k].append(i)
+        else:
+            for i in self.I_index:
+                for k in range(self.args.num_IN_class):
+                    if self.unlabeled_dst[i][1] == k:
+                        label_i_index[k].append(i)
 
         label_i_loader = []
         for i in range(len(label_i_index)):
