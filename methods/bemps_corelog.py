@@ -16,9 +16,9 @@ class corelog(ALMethod):
         self.U_index_sub = np.array(self.U_index)[subset_idx]
 
     def run(self):
-        selection_indices = self.rank_uncertainty()  # 已经是最终选出的索引
-        return selection_indices, None  # 或者 scores 传个空，或者传别的
-
+        selection_indices = self.rank_uncertainty()  # Already the final seleced indices
+        return selection_indices, None 
+    
     def rank_uncertainty(self):
         self.models['backbone'].eval()
         with torch.no_grad():
@@ -114,26 +114,24 @@ class corelog(ALMethod):
             rr = clustering(rr_X_Xp, probs_B_K_C, T, self.args.n_query)
             return rr
 
-
-
     def pad_tensor_to_shape(self, tensor, target_shape, concat_dim=1):
         """
-        对 tensor 进行 padding 使其在除 concat_dim 外的各维度达到 target_shape 的尺寸。
-        若某个维度 tensor 大于 target_shape则保持原尺寸或视情况裁剪。
-        注意 F.pad 的 pad 参数顺序为 [最后一维左补, 最后一维右补, 倒数第二维左补, 倒数第二维右补, ...]
+        Pad the tensor to make its dimensions, except for concat_dim, match the target_shape.
+        If a dimension of the tensor is larger than the target_shape, keep the original size or trim as needed.
+        Note that the order of the pad parameter in F.pad is [left pad of last dimension, right pad of last dimension, left pad of second last dimension, right pad of second last dimension, ...]
         """
         curr_shape = list(tensor.shape)
         pad_dims = []
-        # 依次计算每个维度（从最后一维开始）
+        # Calculate each dimension in reverse order (starting from the last dimension)
         for i in range(len(curr_shape)-1, -1, -1):
             if i == concat_dim:
-                # 拼接维度不做修改
+                # Do not modify the concatenation dimension
                 pad_dims.extend([0, 0])
             else:
                 diff = target_shape[i] - curr_shape[i]
-                # 如果当前尺寸大于目标，则不裁剪（或根据需求进行裁剪，这里保持原尺寸）
+                # If the current size is larger than the target, do not trim (or trim as needed; here we keep the original size)
                 diff = diff if diff > 0 else 0
-                # 在该维度末尾填充 diff 个单位
+                # Pad diff units at the end of this dimension
                 pad_dims.extend([0, diff])
         return F.pad(tensor, pad_dims)
 
@@ -142,65 +140,39 @@ class corelog(ALMethod):
         Q_index = [self.U_index[idx] for idx in selected_indices]
         return Q_index, scores
 
-    # drop out for images
-    # def predict_prob_dropout_split(self, to_predict_dataset, to_predict_dataloader, n_drop):
-
-    #     # self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    #     # Ensure model is on right device and is in TRAIN mode.
-    #     # Train mode is needed to activate randomness in dropout modules.
-    #     self.models['backbone'].train()
-    #     self.models['backbone'] = self.models['backbone'].to(self.args.device)
-
-    #     # Create a tensor to hold probabilities
-    #     probs = torch.zeros([n_drop, len(to_predict_dataset), len(self.args.target_list)]).to(self.args.device)
-
-    #     # Create a dataloader object to load the dataset
-    #     # to_predict_dataloader = torch.utils.data.DataLoader(to_predict_dataset, batch_size=self.args['batch_size'], shuffle=False)
-
-    #     with torch.no_grad():
-    #         # Repeat n_drop number of times to obtain n_drop dropout samples per data instance
-    #         print('Processing model dropout...')
-    #         for i in tqdm(range(n_drop)):
-
-    #             evaluated_instances = 0
-    #             # for i, data in enumerate(selection_loader):
-    #             # inputs = data[0].to(self.args.device)
-    #             for _, elements_to_predict in enumerate(to_predict_dataloader):
-    #                 # Calculate softmax (probabilities) of predictions
-    #                 elements_to_predict = elements_to_predict[0].to(self.args.device)
-    #                 out = self.models['backbone'](elements_to_predict)[0]
-    #                 # print(out)
-    #                 pred = torch.nn.functional.softmax(out, dim=1)
-
-    #                 # Accumulate the calculated batch of probabilities into the tensor to return
-    #                 start_slice = evaluated_instances
-    #                 end_slice = start_slice + elements_to_predict.shape[0]
-    #                 probs[i][start_slice:end_slice] = pred
-    #                 evaluated_instances = end_slice
-
-    #     return probs
-    
     def predict_prob_dropout_split(self, to_predict_dataset, to_predict_dataloader, n_drop):
-        self.models['backbone'].train()
-        self.models['backbone'] = self.models['backbone'].to(self.args.device)
+        """
+        Set model to train() to activate dropout, perform n_drop forward passes,
+        and return a probability tensor of shape (n_drop, dataset_size, num_classes).
+        """
+        model = self.models['backbone'].to(self.args.device)
+        model.train()  # VERY IMPORTANT: This activates dropout
 
-        probs = torch.zeros([n_drop, len(to_predict_dataset), len(self.args.target_list)], device=self.args.device)
+        n_classes = len(self.args.target_list)
+        probs = torch.zeros([n_drop, len(to_predict_dataset), n_classes], device=self.args.device)
 
-        with torch.no_grad():
-            print('Processing model dropout...')
-            for i in tqdm(range(n_drop)):
-                evaluated_instances = 0
-                for _, data in enumerate(to_predict_dataloader):
-                    input_ids = data['input_ids'].to(self.args.device)
-                    attention_mask = data['attention_mask'].to(self.args.device)
-                    preds = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask).logits
-                    # 将logits转换为概率分布
-                    pred_probs = softmax(preds, dim=-1)
-                    batch_size = input_ids.size(0)
+        print('Processing Monte Carlo dropout...')
+        # Re-sample n_drop times
+        for i in tqdm(range(n_drop)):
+            evaluated_instances = 0
+            for batch_data in to_predict_dataloader:
+                with torch.no_grad():
+                    if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                        input_ids = batch_data['input_ids'].to(self.args.device)
+                        attention_mask = batch_data['attention_mask'].to(self.args.device)
+                        logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
+                        pred_probs = torch.softmax(logits, dim=-1)
+                        batch_size = input_ids.size(0)
+                    else:
+                        inputs = batch_data[0].to(self.args.device)
+                        logits, _ = model(inputs)
+                        pred_probs = torch.softmax(logits, dim=1)
+                        batch_size = inputs.size(0)
+
+                    # Accumulate and store probabilities
                     start_slice = evaluated_instances
                     end_slice = start_slice + batch_size
-                    probs[i][start_slice:end_slice] = pred_probs
+                    probs[i, start_slice:end_slice, :] = pred_probs
                     evaluated_instances = end_slice
 
         return probs
@@ -218,7 +190,7 @@ def clustering(rr_X_Xp, probs_B_K_C, T, batch_size):
     rr_topk_X_indices = rr_topk_X.indices.cpu().detach().numpy()
 
     rr_X_Xp = rr_X_Xp[rr_topk_X_indices]
-    rr_X_Xp = normalize(rr_X_Xp, dim=-1)  # 根据需要选择正确的归一化维度
+    rr_X_Xp = normalize(rr_X_Xp, dim=-1)
 
     rr = kmeans(rr_X_Xp, batch_size)
     rr = [rr_topk_X_indices[x] for x in rr]
@@ -227,7 +199,6 @@ def clustering(rr_X_Xp, probs_B_K_C, T, batch_size):
 def kmeans(rr, k):
     rr = rr.cpu().numpy()
     if len(rr) < k:
-        # 如果样本数不足以形成k个聚类，可根据逻辑进行特殊处理
         k = len(rr)
     kmeans = KMeans(n_clusters=k).fit(rr)
     centers = kmeans.cluster_centers_
