@@ -9,7 +9,7 @@ class Uncertainty(ALMethod):
         
         selection_choices = [
             "CONF", "Entropy", "Margin", 
-            "MeanSTD", "BALDDropout", "VarRatio", 
+            "MeanSTD", "BALD", "VarRatio", 
             "MarginDropout", "CONFDropout", "EntropyDropout"
         ]
         if selection_method not in selection_choices:
@@ -109,7 +109,7 @@ class Uncertainty(ALMethod):
         # Handling MC Dropout-based methods
         # ---------------------
         if self.selection_method in [
-            "MeanSTD", "BALDDropout", "MarginDropout", 
+            "MeanSTD", "BALD", "MarginDropout", 
             "CONFDropout", "EntropyDropout"
         ]:
             # Note: predict_prob_dropout_split internally sets model.train() 
@@ -130,7 +130,7 @@ class Uncertainty(ALMethod):
                 # Store negative values to ensure correct ranking
                 scores = -uncertainties.cpu().numpy()
 
-            elif self.selection_method == "BALDDropout":
+            elif self.selection_method == "BALD":
                 # pb = E[p(y|x, w)] (mean probability)
                 pb = probs_mc.mean(dim=0)  # shape=[N, num_classes]
                 # H(mean) = -\sum pb * log pb

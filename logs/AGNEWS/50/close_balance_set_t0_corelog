@@ -1,0 +1,25 @@
+This experiment time is:
+2025-02-26 08:02:25
+Experiment settings:
+AL method:corelog
+Dataset:AGNEWS
+Model random seed:0
+Backbone:DistilBert
+Optimizer:AdamW
+Learning rate:0.0001
+Weight decay:0.0005
+Gamma value for StepLR:0.5
+Step size for StepLR:50
+Number of total epochs each cycle:40
+Initial training set size:50
+Cycle |  Test Accuracy |  Number of in-domain query data |  Queried Classes
+1 | 81.42105343467311 | 50 | 0: 15, 1: 9, 2: 13, 3: 13
+2 | 81.18421203211734 | 50 | 0: 17, 1: 12, 2: 4, 3: 17
+3 | 82.67105393660695 | 50 | 0: 9, 1: 12, 2: 12, 3: 17
+4 | 86.17105263157895 | 50 | 0: 15, 1: 12, 2: 13, 3: 10
+5 | 87.44736982646741 | 50 | 0: 13, 1: 12, 2: 11, 3: 14
+6 | 85.92105363544665 | 50 | 0: 15, 1: 12, 2: 11, 3: 12
+7 | 86.93421263443797 | 50 | 0: 16, 1: 9, 2: 9, 3: 16
+8 | 87.46052832352488 | 50 | 0: 14, 1: 12, 2: 10, 3: 14
+9 | 87.90789614225689 | 50 | 0: 12, 1: 10, 2: 12, 3: 16
+10 | 88.22368571632786 | 50 | 0: 14, 1: 12, 2: 15, 3: 9

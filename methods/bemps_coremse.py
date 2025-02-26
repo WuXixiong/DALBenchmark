@@ -184,30 +184,70 @@ def random_generator_for_x_prime(x_dim, size):
     return sorted(sample_indices)
 
 def clustering(rr_X_Xp, probs_B_K_C, T, batch_size):
-
+    """
+    Perform top-k selection on rr_X_Xp followed by k-means clustering.
+    """
+    # First, sum rr_X_Xp along the last dimension, essentially scoring the data.
     rr_X = torch.sum(rr_X_Xp, dim=-1)
-    rr_topk_X = torch.topk(rr_X, max(round(probs_B_K_C.shape[0] * T), batch_size))
-    # rr_topk_X = torch.topk(rr_X, max(round(probs_B_K_C.shape[1] * T), batch_size))
+    
+    # Restore the data dimension to probs_B_K_C.shape[1] instead of n_drop.
+    data_size = probs_B_K_C.shape[1]
+    topk_size = max(round(data_size * T), batch_size)
+    
+    # Select the top-k_size elements with the highest scores.
+    rr_topk_X = torch.topk(rr_X, topk_size)
     rr_topk_X_indices = rr_topk_X.indices.cpu().detach().numpy()
 
+    # Extract rr_X_Xp based on the top-k indices.
     rr_X_Xp = rr_X_Xp[rr_topk_X_indices]
+    # Normalize the extracted data.
     rr_X_Xp = normalize(rr_X_Xp, dim=-1)
 
+    # Perform k-means clustering.
     rr = kmeans(rr_X_Xp, batch_size)
+    # The indices in rr are relative to rr_topk_X_indices.
+    # Therefore, map them back to the global indices.
     rr = [rr_topk_X_indices[x] for x in rr]
     return rr
 
+
 def kmeans(rr, k):
+    """
+    Perform k-means clustering on rr to select k "representative" indices 
+    (if the actual number of valid points is less than k, scale accordingly).
+    Additionally, to prevent an insufficient number of clusters due to duplicate data, 
+    duplicates are removed before performing k-means.
+    """
+    # Convert to a numpy array.
     rr = rr.cpu().numpy()
-    if len(rr) < k:
-        k = len(rr)
-    kmeans = KMeans(n_clusters=k).fit(rr)
-    centers = kmeans.cluster_centers_
-    centroids = cdist(centers, rr).argmin(axis=1)
+    
+    # 1) Remove duplicate rows (completely identical vectors) to obtain unique vectors rr_unique.
+    rr_unique, unique_indices = np.unique(rr, axis=0, return_index=True)
+    
+    # If the actual number of valid vectors is smaller than k, dynamically reduce k.
+    if len(rr_unique) < k:
+        k = len(rr_unique)
+    
+    # 2) Perform k-means clustering using the unique vectors to avoid warnings from scikit-learn.
+    kmeans_model = KMeans(n_clusters=k, random_state=0).fit(rr_unique)
+    centers = kmeans_model.cluster_centers_
+    
+    # 3) Match each cluster center back to the original rr (including duplicates),
+    #    ensuring that the obtained indices can be used for later indexing.
+    dist = cdist(centers, rr)
+    centroids = dist.argmin(axis=1)
+    
+    # 4) Remove duplicates to prevent multiple centers from coincidentally mapping to the same point.
     centroids_set = np.unique(centroids)
     m = k - len(centroids_set)
+    centroids = centroids_set
+    
+    # If there are still missing elements, randomly select some from the "remaining unselected points"
+    # to ensure the final number of returned indices is k.
     if m > 0:
+        print(f"Warning: {m} centroids are missing due to duplicate data. Randomly selecting from the remaining points.")
         pool = np.delete(np.arange(len(rr)), centroids_set)
-        p = np.random.choice(len(pool), m)
-        centroids = np.concatenate((centroids_set, pool[p]), axis=None)
+        p = np.random.choice(len(pool), m, replace=False)
+        centroids = np.concatenate((centroids, pool[p]), axis=None)
+
     return centroids
