@@ -14,7 +14,6 @@ import nets
 # from utils import *
 # from load_split_data import *
 # from arguments import parser
-from .combinedataset import PairedDataset
 
 '''
 This implementation is with reference of https://github.com/sinhasam/vaal.
