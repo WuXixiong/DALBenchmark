@@ -17,8 +17,17 @@ class Coreset(ALMethod):
 
             # generate entire labeled_in features set
             for data in labeled_in_loader:
-                inputs = data[0].to(self.args.device)
-                out, features = self.models['backbone'](inputs)
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                # Extract input_ids, attention_mask, and labels from the dictionary
+                    input_ids = data['input_ids'].to(self.args.device)
+                    attention_mask = data['attention_mask'].to(self.args.device)
+                    outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                    hidden_states = outputs.hidden_states
+                    last_hidden_state = hidden_states[-1]
+                    features = last_hidden_state[:, 0, :]
+                else:
+                    inputs = data[0].to(self.args.device)
+                    _, features = self.models['backbone'](inputs)  # features.shape = [B, embDim]
 
                 if labeled_features is None:
                     labeled_features = features
@@ -27,8 +36,18 @@ class Coreset(ALMethod):
 
             # generate entire unlabeled features set
             for data in unlabeled_loader:
-                inputs = data[0].to(self.args.device)
-                out, features = self.models['backbone'](inputs)
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                # Extract input_ids, attention_mask, and labels from the dictionary
+                    input_ids = data['input_ids'].to(self.args.device)
+                    attention_mask = data['attention_mask'].to(self.args.device)
+                    outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                    hidden_states = outputs.hidden_states
+                    last_hidden_state = hidden_states[-1]
+                    features = last_hidden_state[:, 0, :]
+                else:
+                    inputs = data[0].to(self.args.device)
+                    _, features = self.models['backbone'](inputs)  # features.shape = [B, embDim]
+
                 if unlabeled_features is None:
                     unlabeled_features = features
                 else:
@@ -68,3 +87,4 @@ class Coreset(ALMethod):
         Q_index = [self.U_index[idx] for idx in selected_indices]
 
         return Q_index, scores
+    
