@@ -8,8 +8,6 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 
-
-
 class AlphaMixSampling(ALMethod):
 	def __init__(self, args, models, train_dst, unlabeled_dst, U_index, I_index, **kwargs):
 		super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
@@ -22,31 +20,47 @@ class AlphaMixSampling(ALMethod):
 
 	def select(self):
 		n = self.args.n_query
-		# self.query_count += 1
-
-		#idxs = self.idxs_lb if idxs_prohibited is None else (self.idxs_lb + idxs_prohibited)
-		# idxs_unlabeled = np.arange(self.n_pool)[~idxs]
 		self.models['backbone'].eval()
-		# selection_loader = torch.utils.data.DataLoader(self.unlabeled_set, batch_size=self.args.test_batch_size, num_workers=self.args.workers)
 		unlabeled_subset = torch.utils.data.Subset(self.unlabeled_dst, self.U_index_sub)
 		selection_loader = torch.utils.data.DataLoader(unlabeled_subset, batch_size=self.args.n_query, num_workers=self.args.workers)
 		scores = np.array([])
 		batch_num = len(selection_loader)
 		ulb_probs = None
 		org_ulb_embedding = None
+
+		# get the last layer of the backbone
+		if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+			old_fc = self.models['backbone'].classifier
+		else:
+			old_fc = self.models['backbone'].get_last_layer()
+		out_features = old_fc.out_features
+		in_features  = old_fc.in_features
+		# create a new linear layer with the same weights and biases
+		self.fc2 = nn.Linear(in_features, out_features, bias=True).to(self.args.device)
+		with torch.no_grad():
+			self.fc2.weight.copy_(old_fc.weight)
+			self.fc2.bias.copy_(old_fc.bias)
+		# not to update the weights of the new linear layer
+		self.fc2.weight.requires_grad = False
+		self.fc2.bias.requires_grad = False
+
 		print("| Calculating uncertainty of Unlabeled set")
 		for i, data in enumerate(selection_loader):
-			if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
-			# Extract input_ids, attention_mask, and labels from the dictionary
-				input_ids = data['input_ids'].to(self.args.device)
-				attention_mask = data['attention_mask'].to(self.args.device)
-                # labels = data['labels'].to(self.args.device)
-			else:
-				inputs = data[0].to(self.args.device)
 			if i % self.args.print_freq == 0:
 				print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
 				with torch.no_grad():
-					preds, embedding = self.models['backbone'](inputs)
+					if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+					# Extract input_ids, attention_mask, and labels from the dictionary
+						input_ids = data['input_ids'].to(self.args.device)
+						attention_mask = data['attention_mask'].to(self.args.device)
+						outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+						preds = outputs.logits
+						hidden_states = outputs.hidden_states
+						last_hidden_state = hidden_states[-1]
+						embedding = last_hidden_state[:, 0, :]
+					else:
+						inputs = data[0].to(self.args.device)
+						preds, embedding = self.models['backbone'](inputs)
 					probs = torch.nn.functional.softmax(preds, dim=1)
 
 					# If this is the first batch, initialize all_probs and all_embeddings
@@ -58,8 +72,6 @@ class AlphaMixSampling(ALMethod):
 					ulb_probs = torch.cat((ulb_probs, probs), dim=0)
 					org_ulb_embedding = torch.cat((org_ulb_embedding, embedding), dim=0)
 
-		# ulb_probs, org_ulb_embedding = self.predict_prob_embed(self.X[idxs_unlabeled], self.Y[idxs_unlabeled])
-
 		probs_sorted, probs_sort_idxs = ulb_probs.sort(descending=True)
 		pred_1 = probs_sort_idxs[:, 0]
 
@@ -69,11 +81,20 @@ class AlphaMixSampling(ALMethod):
 		org_lb_embedding = None
 		print("| Calculating uncertainty of labeled set")
 		for i, data in enumerate(labeled_loader):
-			inputs = data[0].to(self.args.device)
 			if i % self.args.print_freq == 0:
 				print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
 				with torch.no_grad():
-					preds, embedding = self.models['backbone'](inputs)
+					if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+					# Extract input_ids, attention_mask, and labels from the dictionary
+						input_ids = data['input_ids'].to(self.args.device)
+						attention_mask = data['attention_mask'].to(self.args.device)
+						outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+						hidden_states = outputs.hidden_states
+						last_hidden_state = hidden_states[-1]
+						embedding = last_hidden_state[:, 0, :]
+					else:
+						inputs = data[0].to(self.args.device)
+						preds, embedding = self.models['backbone'](inputs)
 					probs = torch.nn.functional.softmax(preds, dim=1)
 
 					# If this is the first batch, initialize all_probs and all_embeddings
@@ -84,7 +105,6 @@ class AlphaMixSampling(ALMethod):
         			# Concatenate probs and embeddings from this batch with the previously accumulated ones
 					lb_probs = torch.cat((lb_probs, probs), dim=0)
 					org_lb_embedding = torch.cat((org_lb_embedding, embedding), dim=0)
-		# lb_probs, org_lb_embedding = self.predict_prob_embed(self.X[self.idxs_lb], self.Y[self.idxs_lb])
 
 		ulb_embedding = org_ulb_embedding
 		lb_embedding = org_lb_embedding
@@ -97,9 +117,6 @@ class AlphaMixSampling(ALMethod):
 
 		if self.args.alpha_closed_form_approx:
 			var_emb = Variable(ulb_embedding, requires_grad=True).to(self.args.device)
-			# out, _ = self.model.clf(var_emb, embedding=True)
-			# out, _ = self.models['backbone'](var_emb)
-			self.fc2 = nn.Linear(var_emb.size(1), int(self.args.n_class)).to(self.args.device)
 			out = self.fc2(var_emb)
 			loss = F.cross_entropy(out, pred_1.to(self.args.device))
 			grads = torch.autograd.grad(loss, var_emb)[0].data.cpu()
@@ -125,13 +142,13 @@ class AlphaMixSampling(ALMethod):
 			min_alphas[is_changed] = tmp_min_alphas[is_changed]
 			candidate += tmp_pred_change
 
-			# print('With alpha_cap set to %f, number of inconsistencies: %d' % (alpha_cap, int(tmp_pred_change.sum().item())))
+			print('With alpha_cap set to %f, number of inconsistencies: %d' % (alpha_cap, int(tmp_pred_change.sum().item())))
 
 			if candidate.sum() > n:
 				break
 
 		if candidate.sum() > 0:
-			# print('Number of inconsistencies: %d' % (int(candidate.sum().item())))
+			print('Number of inconsistencies: %d' % (int(candidate.sum().item())))
 
 			print('alpha_mean_mean: %f' % min_alphas[candidate].mean(dim=1).mean().item())
 			print('alpha_std_mean: %f' % min_alphas[candidate].mean(dim=1).std().item())
@@ -141,21 +158,16 @@ class AlphaMixSampling(ALMethod):
 			c_alpha = c_alpha.cpu()
 
 			selected_idxs = self.sample(min(n, candidate.sum().item()), feats=c_alpha)
-			# u_selected_idxs = candidate.nonzero(as_tuple=True)[0][selected_idxs]
-			# selected_idxs = self.U_index[candidate][selected_idxs] # not sure ???
-			
-			# selected_idxs = [self.U_index[i] for i in selected_idxs]
 			selected_idxs = self.U_index_sub[selected_idxs]
 
 		else:
 			selected_idxs = np.array([], dtype=np.int)
 
-		# if len(selected_idxs) < n:
-		# 	remained = n - len(selected_idxs)
-		# 	idx_lb = copy.deepcopy(self.idxs_lb)
-		# 	idx_lb[selected_idxs] = True
-		# 	selected_idxs = np.concatenate([selected_idxs, np.random.choice(np.where(idx_lb == 0)[0], remained)])
-		# 	print('picked %d samples from RandomSampling.' % (remained))
+		if len(selected_idxs) < n:
+			remained = n - len(selected_idxs)
+			remained_index = list(set(self.U_index) - set(selected_idxs))
+			selected_idxs = np.concatenate([selected_idxs, np.random.choice(remained_index, remained, replace=False)])
+			print('picked %d samples from RandomSampling.' % (remained))
 		
 		scores = list(np.ones(len(selected_idxs)))  # equally assign 1 (meaningless)
 
@@ -164,8 +176,6 @@ class AlphaMixSampling(ALMethod):
 	def find_alpha(self):
 		assert self.args.alpha_num_mix <= self.args.n_label - (
 			0 if self.args.alpha_use_highest_class_mix else 1), 'c_num_mix should not be greater than number of classes'
-
-		# self.query_count += 1
 
 		idxs_unlabeled = np.arange(self.n_pool)[self.idxs_lb]
 
@@ -187,7 +197,6 @@ class AlphaMixSampling(ALMethod):
 			if self.args.alpha_alpha_growth_method == 'exponential':
 				alpha_cap = self.args.alpha_cap / (pow(2, self.args.alpha_alpha_scales - i - 1))
 			else:
-				#alpha_cap *= float(n * (1 if self.args.alpha_max_changes <= 0 else self.args.alpha_max_changes)) / pred_change.sum().item()
 				alpha_cap += self.args.alpha_cap / (pow(2, self.args.alpha_alpha_scales - 1))
 
 			tmp_pred_change, tmp_pred_change_sum, tmp_min_alphas, tmp_min_added_feats, tmp_cf_probs, _, tmp_min_mixing_labels, tmp_min_cf_feats = \
@@ -227,9 +236,6 @@ class AlphaMixSampling(ALMethod):
 				alpha = self.calculate_optimum_alpha(alpha_cap, embed_i, ulb_embed, grads)
 
 				embedding_mix = (1 - alpha) * ulb_embed + alpha * embed_i
-				# out, _ = self.model.clf(embedding_mix, embedding=True)
-				# out, _ = self.models['backbone'](embedding_mix)
-				self.fc2 = nn.Linear(embedding_mix.size(1), int(self.args.n_class)).to(self.args.device)
 				out = self.fc2(embedding_mix)
 				out = out.detach().cpu()
 				alpha = alpha.cpu()
@@ -245,8 +251,6 @@ class AlphaMixSampling(ALMethod):
 					anchor_i = anchor_i.to(self.args.device)
 					alpha = alpha.to(self.args.device)
 					embedding_mix = (1 - alpha) * ulb_embedding + alpha * anchor_i
-					# out, _ = self.models['backbone'](embedding_mix.to(self.args.device))
-					self.fc2 = nn.Linear(embedding_mix.size(1), int(self.args.n_class)).to(self.args.device)
 					out = self.fc2(embedding_mix.to(self.args.device))
 					out = out.detach().cpu()
 					pred_1 = pred_1.detach().cpu()
@@ -323,9 +327,6 @@ class AlphaMixSampling(ALMethod):
 				c_e = anchor_embed[start_idx:end_idx].to(self.args.device)
 				embedding_mix = (1 - l) * e + l * c_e
 
-				# out, _ = self.models['backbone'](embedding_mix, embedding=True)
-				# out, _ = self.models['backbone'](embedding_mix)
-				self.fc2 = nn.Linear(embedding_mix.size(1), int(self.args.n_class)).to(self.args.device)
 				out = self.fc2(embedding_mix)
 
 				label_change = out.argmax(dim=1) != labels[start_idx:end_idx]

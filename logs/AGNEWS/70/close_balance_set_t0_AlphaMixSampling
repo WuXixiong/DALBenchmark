@@ -1,0 +1,25 @@
+This experiment time is:
+2025-02-27 15:20:05
+Experiment settings:
+AL method:AlphaMixSampling
+Dataset:AGNEWS
+Model random seed:0
+Backbone:DistilBert
+Optimizer:AdamW
+Learning rate:0.0001
+Weight decay:0.0005
+Gamma value for StepLR:0.5
+Step size for StepLR:50
+Number of total epochs each cycle:50
+Initial training set size:70
+Cycle |  Test Accuracy |  Number of in-domain query data |  Queried Classes
+1 | 83.40789634303043 | 70 | 0: 12, 1: 17, 2: 15, 3: 26
+2 | 84.90789614225689 | 70 | 0: 21, 1: 11, 2: 18, 3: 20
+3 | 85.4605279219778 | 70 | 0: 19, 1: 19, 2: 15, 3: 17
+4 | 87.57894867344906 | 70 | 0: 21, 1: 9, 2: 21, 3: 19
+5 | 87.84210707011975 | 70 | 0: 20, 1: 16, 2: 11, 3: 23
+6 | 87.88157975046258 | 70 | 0: 17, 1: 22, 2: 13, 3: 18
+7 | 87.73684421338533 | 70 | 0: 18, 1: 21, 2: 17, 3: 14
+8 | 88.05263288397538 | 70 | 0: 16, 1: 26, 2: 14, 3: 14
+9 | 87.94737032840126 | 70 | 0: 18, 1: 18, 2: 20, 3: 14
+10 | 87.39473834790681 | 70 | 0: 11, 1: 18, 2: 24, 3: 17

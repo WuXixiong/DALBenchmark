@@ -465,7 +465,6 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
                 print(c)
                 ood_Q_index.append(Q_index[i])
         print("# query in: {}, ood: {}".format(len(in_Q_index), len(ood_Q_index)))
-
         L_index = L_index + in_Q_index
         print("# Now labelled in: {}".format(len(L_index)))
         

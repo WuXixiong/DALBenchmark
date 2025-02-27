@@ -1,0 +1,25 @@
+This experiment time is:
+2025-02-27 14:55:06
+Experiment settings:
+AL method:AlphaMixSampling
+Dataset:SST5
+Model random seed:0
+Backbone:DistilBert
+Optimizer:AdamW
+Learning rate:0.0001
+Weight decay:0.0005
+Gamma value for StepLR:0.5
+Step size for StepLR:50
+Number of total epochs each cycle:50
+Initial training set size:70
+Cycle |  Test Accuracy |  Number of in-domain query data |  Queried Classes
+1 | 37.82440723733043 | 70 | 1: 10, 2: 19, 3: 20, 4: 21
+2 | 39.64660485919045 | 70 | 1: 11, 2: 28, 3: 12, 4: 19
+3 | 44.174490096093805 | 70 | 1: 13, 2: 21, 3: 12, 4: 24
+4 | 45.55494272452175 | 70 | 1: 7, 2: 23, 3: 16, 4: 24
+5 | 47.818883644158774 | 70 | 1: 9, 2: 17, 3: 15, 4: 29
+6 | 46.051906326605696 | 70 | 1: 8, 2: 23, 3: 16, 4: 23
+7 | 45.77581495793731 | 70 | 1: 8, 2: 31, 3: 14, 4: 17
+8 | 46.548868066628685 | 70 | 1: 11, 2: 19, 3: 23, 4: 17
+9 | 46.27277734883907 | 70 | 1: 8, 2: 25, 3: 13, 4: 24
+10 | 45.83103247547202 | 70 | 1: 11, 2: 18, 3: 16, 4: 25

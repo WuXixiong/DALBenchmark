@@ -82,13 +82,6 @@ class ResNet_32x32(nn.Module):
         self.embedding_recorder = EmbeddingRecorder(record_embedding)
         self.no_grad = no_grad
 
-        # PAL
-        # widen_factor = 8
-        # channels = [16, 16*widen_factor, 32*widen_factor, 64*widen_factor]
-        # self.fc = nn.Linear(channels[3], num_classes)
-        # out_open = 2 * num_classes
-        # self.fc_open = nn.Linear(channels[3], out_open, bias=False)
-
     def get_last_layer(self):
         return self.linear
 
