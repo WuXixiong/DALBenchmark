@@ -829,7 +829,7 @@ def train(args, models, criterion, optimizers, schedulers, dataloaders, criterio
             schedulers['backbone'].step()
 
     
-    elif args.method in ['LFOSA', 'EOAL']: #LFOSA, EOAL
+    elif args.method in ['LFOSA', 'EOAL']: # LFOSA, EOAL
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
             epoch_loss, epoch_accuracy = train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch)
             schedulers['backbone'].step()
@@ -845,7 +845,7 @@ def train(args, models, criterion, optimizers, schedulers, dataloaders, criterio
             schedulers['backbone'].step()
         writer.close()
 
-    elif args.method in ['LL']: #MQNet
+    elif args.method in ['LL']: # LL
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
             train_epoch_LL(args, models, epoch, criterion, optimizers, dataloaders)
             schedulers['backbone'].step()

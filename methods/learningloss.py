@@ -7,9 +7,9 @@ class LL(ALMethod):
         super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
         self.I_index = I_index
         self.labeled_in_set = torch.utils.data.Subset(self.unlabeled_dst, self.I_index)
-        # subset selection (for diversity) # currently remove for compare with other algorithms
-        # subset_idx = np.random.choice(len(self.U_index), size=(min(self.args.subset, len(self.U_index)),), replace=False)
-        # self.U_index_sub = np.array(self.U_index)[subset_idx]
+        # subset selection (for diversity) 
+        subset_idx = np.random.choice(len(self.U_index), size=(min(self.args.subset, len(self.U_index)),), replace=False)
+        self.U_index_sub = np.array(self.U_index)[subset_idx]
 
     def run(self):
         scores = self.get_predloss()
