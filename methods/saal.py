@@ -1,24 +1,38 @@
-from .almethod import ALMethod 
+from .almethod import ALMethod   
 import torch
 import numpy as np
 import random
 import copy
-import pdb
+import pdb  # Consider removing or replacing pdb.set_trace() in production
 from sklearn.metrics import pairwise_distances
 from scipy import stats
 from torch.utils.data import DataLoader, Subset
 import torch.nn as nn
 import torch.nn.functional as F
-from tqdm import tqdm  # 用于进度条
+from tqdm import tqdm 
 
 class SAAL(ALMethod):
     def __init__(self, args, models, unlabeled_dst, U_index, **kwargs):
         super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
-        # 仅随机挑选一部分未标注数据用于构建子集
+        # Randomly select only a portion of the unlabeled data
         subset_idx = np.random.choice(len(self.U_index),
                                       size=(min(self.args.subset, len(self.U_index)),),
                                       replace=False)
         self.U_index_sub = np.array(self.U_index)[subset_idx]
+
+    def collate_batch(self, batch_list):
+        """
+        Batch the data in batch_list according to the dataset type:
+          - For text datasets: Each element in the list is a dictionary; stack each field to form a batched tensor.
+          - For non-text datasets: Directly stack into a tensor.
+        """
+        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            return {
+                'input_ids': torch.stack([item['input_ids'] for item in batch_list]).to(self.args.device),
+                'attention_mask': torch.stack([item['attention_mask'] for item in batch_list]).to(self.args.device)
+            }
+        else:
+            return torch.stack(batch_list).to(self.args.device)
 
     def select(self, **kwargs):
         selected_indices, scores = self.run()
@@ -26,115 +40,126 @@ class SAAL(ALMethod):
         return Q_index, scores
 
     def run(self):
+        # Set the backbone model to evaluation mode
         self.models['backbone'].eval()
         print('...Acquisition Only')
 
-        # 若有需要，可只采样一部分数据; 原代码中是 len(self.U_index) 整体
-        # subpool_indices = random.sample(self.U_index, self.args.pool_subset)
-        subpool_indices = random.sample(self.U_index, len(self.U_index))
-
-        # 将数据一次性加载到CPU内存中（如数据过大，可考虑分批次或 DataLoader）
+        # Optionally sample only a subset of data; the original code samples from the entire U_index
+        subpool_indices = random.sample(self.U_index, self.args.pool_subset)
+        
         pool_data_dropout = []
         for idx in subpool_indices:
             data = self.unlabeled_dst[idx]
-            pool_data_dropout.append(data[0])
-        pool_data_dropout = torch.stack(pool_data_dropout)
+            if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                # Retain the complete dictionary data (including input_ids, attention_mask, etc.)
+                pool_data_dropout.append(data)
+            else:
+                # For non-text datasets, assume data is a tuple and the first element is the input tensor
+                pool_data_dropout.append(data[0].to(self.args.device))
+        
+        # For non-text datasets, stack the list into a tensor; for text datasets, keep as a list for batch processing
+        if self.args.dataset not in ['AGNEWS', 'IMDB', 'SST5']:
+            pool_data_dropout = torch.stack(pool_data_dropout)
 
-        # 计算获取函数（分数）
+        # Compute the acquisition scores using the maximum sharpness function
         points_of_interest = self.max_sharpness_acquisition_pseudo(
             pool_data_dropout,
             self.args,
-            self.models['backbone']
+            self.models['backbone']  # Consider using the passed-in model consistently
         )
         points_of_interest = points_of_interest.detach().cpu().numpy()
 
-        # 根据 acqMode 进行后处理，是否加入样本间多样性
+        # Post-process based on acqMode, adding diversity if specified
         if 'Diversity' in self.args.acqMode:
             pool_index = self.init_centers(points_of_interest, int(self.args.n_query))
         else:
-            # 按分数排序，取前 n_query 个
+            # Sort by scores and select the top n_query indices
             pool_index = points_of_interest.argsort()[::-1][:int(self.args.n_query)]
 
         pool_index = torch.from_numpy(pool_index)
-        return pool_index.cpu().tolist(), None  # index, score
+        return pool_index.cpu().tolist(), None  # Return index and score (score is None here)
 
     def max_sharpness_acquisition_pseudo(self, pool_data_dropout, args, model):
         """
-        计算 (i) 原始loss 和 (ii) 参数扰动后的loss，
-        根据acqMode返回不同的分数，如 'Max' 或 'Diff'。
+        Compute (i) the original loss and (ii) the loss after a small parameter perturbation.
+        Depending on acqMode, return different scores such as 'Max' or 'Diff'.
         """
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = model.to(device)
+        model = model.to(self.args.device)
+        # Determine the data size based on the dataset type
+        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            data_size = len(pool_data_dropout)
+        else:
+            data_size = pool_data_dropout.shape[0]
 
-        data_size = pool_data_dropout.shape[0]
-        # 伪标签
-        pool_pseudo_target_dropout = torch.zeros(data_size, dtype=torch.long, device=device)
-
-        # 存放原始loss和扰动后loss
+        # Tensor to store pseudo-labels
+        pool_pseudo_target_dropout = torch.zeros(data_size, dtype=torch.long, device=self.args.device)
         original_loss_list = []
         max_perturbed_loss_list = []
 
-        # 分批处理，避免一次性显存占用过大
+        # Process data in batches to avoid excessive GPU memory usage
         num_batch = int(np.ceil(data_size / args.pool_batch_size))
+        
+        # Initialize criterion once outside the loop to improve efficiency
+        criterion = nn.CrossEntropyLoss(reduction='none')
 
-        # ---------- 1) 先计算原始loss并得到伪标签 ----------
-        model.eval()  # 只需要前向传播，不需要参数更新
+        # ---------- 1) First, compute the original loss and obtain pseudo-labels ----------
+        model.eval()
         for idx in tqdm(range(num_batch), desc="Computing original loss"):
             start_idx = idx * args.pool_batch_size
             end_idx = min((idx + 1) * args.pool_batch_size, data_size)
-
-            batch = pool_data_dropout[start_idx:end_idx].to(device)
+            batch = self.collate_batch(pool_data_dropout[start_idx:end_idx])
+            
             with torch.no_grad():
-                output, _ = model(batch)
-                softmaxed = F.softmax(output, dim=1)
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    outputs = self.models['backbone'](input_ids=batch['input_ids'],
+                                                      attention_mask=batch['attention_mask'])
+                    logits = outputs.logits
+                else:
+                    logits, _ = self.models['backbone'](batch)
+                
+                softmaxed = F.softmax(logits, dim=1)
                 pseudo_target = softmaxed.argmax(dim=1)
                 pool_pseudo_target_dropout[start_idx:end_idx] = pseudo_target
 
-            # 计算原始loss（不需要梯度）
-            criterion = nn.CrossEntropyLoss(reduction='none')
-            loss = criterion(output, pseudo_target)
+            loss = criterion(logits, pseudo_target)
             original_loss_list.append(loss.detach())
 
         original_loss = torch.cat(original_loss_list, dim=0)
 
-        # ---------- 2) 对参数做一次性的小扰动，计算扰动后loss ----------
-        # 注意，这里对每个batch单独计算梯度、更新参数、再还原
+        # ---------- 2) Apply a small perturbation to the parameters and compute the perturbed loss ----------
         model.eval()
         for idx in tqdm(range(num_batch), desc="Computing perturbed loss"):
             start_idx = idx * args.pool_batch_size
             end_idx = min((idx + 1) * args.pool_batch_size, data_size)
-
-            batch = pool_data_dropout[start_idx:end_idx].to(device)
+            batch = self.collate_batch(pool_data_dropout[start_idx:end_idx])
             pseudo_target = pool_pseudo_target_dropout[start_idx:end_idx]
 
-            # ---------- (a) 获取并保存当前模型参数 ----------
+            # (a) Save the current model parameters
             original_params = [p.data.clone() for p in model.parameters() if p.requires_grad]
 
-            # ---------- (b) 计算该 batch 的梯度 ----------
-            # 首先要清空梯度
+            # (b) Compute gradients for the batch
             model.zero_grad(set_to_none=True)
-            # 启用梯度计算
             with torch.enable_grad():
-                output, _ = model(batch)
-                criterion = nn.CrossEntropyLoss(reduction='none')
-                loss1 = criterion(output, pseudo_target)
-                # 对 mean 后的loss进行反传
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    outputs = self.models['backbone'](input_ids=batch['input_ids'],
+                                                      attention_mask=batch['attention_mask'])
+                    logits = outputs.logits
+                else:
+                    logits, _ = self.models['backbone'](batch)
+                
+                loss1 = criterion(logits, pseudo_target)
                 loss1.mean().backward()
 
-            # ---------- (c) 根据梯度做参数扰动 ----------
-            # norm of gradients
+            # (c) Perturb the parameters based on the gradients
             with torch.no_grad():
-                # 计算整合后的梯度范数
                 grad_norm = 0.0
                 for p in model.parameters():
                     if p.grad is not None:
                         grad_norm += p.grad.norm(p=2).item() ** 2
                 grad_norm = grad_norm ** 0.5
 
-                # 计算缩放系数
                 scale = args.rho / (grad_norm + 1e-12)
 
-                # 对参数做 e_w = (p^2)*grad*scale 类型的更新
                 idx_param = 0
                 for p in model.parameters():
                     if p.grad is not None:
@@ -142,13 +167,19 @@ class SAAL(ALMethod):
                         p.add_(e_w)
                     idx_param += 1
 
-            # ---------- (d) 计算扰动后loss ----------
+            # (d) Compute the loss after perturbation
             with torch.no_grad():
-                output_updated, _ = model(batch)
-                loss2 = criterion(output_updated, pseudo_target)
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    outputs = self.models['backbone'](input_ids=batch['input_ids'],
+                                                      attention_mask=batch['attention_mask'])
+                    logists_updated = outputs.logits
+                else:
+                    logists_updated, _ = self.models['backbone'](batch)
+                
+                loss2 = criterion(logists_updated, pseudo_target)
             max_perturbed_loss_list.append(loss2.detach())
 
-            # ---------- (e) 恢复原始参数 ----------
+            # (e) Restore the original model parameters
             with torch.no_grad():
                 idx_param = 0
                 for p in model.parameters():
@@ -167,19 +198,20 @@ class SAAL(ALMethod):
 
     def init_centers(self, X, K):
         """
-        简化版 k-center 初始化，用于 'Diversity' 时选取代表性样本。
+        Simplified k-center initialization for selecting representative samples when 'Diversity' is specified.
         """
-        X_array = np.expand_dims(X, 1)  # Shape: (N, 1)
+        # Expand dimensions of X to shape (N, 1)
+        X_array = np.expand_dims(X, 1)
+        # Find the index of the sample with the maximum L2 norm
         ind = np.argmax([np.linalg.norm(s, 2) for s in X_array])
-        mu = [X_array[ind]]  # 初始中心
+        mu = [X_array[ind]]  # Initialize centers with the selected sample
         indsAll = [ind]
         centInds = [0.] * len(X)
         cent = 0
         D2 = None
 
-        # tqdm 用于查看 k-center 选择过程
         pbar = tqdm(total=K, desc="K-center init")
-        pbar.update(1)  # 已经初始化了一个中心
+        pbar.update(1)  # One center has already been initialized
 
         while len(mu) < K:
             if len(mu) == 1:
@@ -191,6 +223,7 @@ class SAAL(ALMethod):
                         centInds[i] = cent
                         D2[i] = newD[i]
 
+            # Instead of breaking into debugger, consider raising an error or logging
             if sum(D2) == 0.0:
                 pdb.set_trace()
 
@@ -205,10 +238,9 @@ class SAAL(ALMethod):
 
         pbar.close()
 
-        # 计算 Gram 矩阵（若后续还需用到可保留此处）
-        gram = np.matmul(X_array[indsAll], X_array[indsAll].T)  # Shape: (K, K)
-        val, _ = np.linalg.eig(gram)
-        val = np.abs(val)
-        # vgt = val[val > 1e-2]  # 若不再使用，可去掉
-
+        # The following computation of the Gram matrix and eigenvalues is not used.
+        # gram = np.matmul(X_array[indsAll], X_array[indsAll].T)  # Shape: (K, K)
+        # val, _ = np.linalg.eig(gram)
+        # val = np.abs(val)
+        
         return np.array(indsAll)
