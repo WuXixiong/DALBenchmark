@@ -1,0 +1,208 @@
+File: badge.py
+  Total number of loops: 3
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'get_grad_features': 0, 'k_means_plus_centers': 0, 'select': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'get_grad_features': 'No recursion', 'k_means_plus_centers': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: bemps_corelog.py
+  Total number of loops: 6
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'run': 0, 'rank_uncertainty': 0, 'pad_tensor_to_shape': 0, 'select': 0, 'predict_prob_dropout_split': 0, 'random_generator_for_x_prime': 0, 'clustering': 0, 'kmeans': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'run': 'No recursion', 'rank_uncertainty': 'No recursion', 'pad_tensor_to_shape': 'No recursion', 'select': 'No recursion', 'predict_prob_dropout_split': 'No recursion', 'random_generator_for_x_prime': 'No recursion', 'clustering': 'No recursion', 'kmeans': 'No recursion'}
+----------------------------------------
+File: mqnet.py
+  Total number of loops: 0
+  Maximum loop nesting level: 0
+  Recursive calls in each function: {'__init__': 0, 'select': 0}
+  Estimated time complexity: O(1)
+  Estimated space complexity: O(1)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: almethod.py
+  Total number of loops: 0
+  Maximum loop nesting level: 0
+  Recursive calls in each function: {'__init__': 0, 'select': 0}
+  Estimated time complexity: O(1)
+  Estimated space complexity: O(1)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: coresetcb.py
+  Total number of loops: 4
+  Maximum loop nesting level: 1
+  Recursive calls in each function: {'__init__': 0, 'get_features': 0, 'k_center_greedy': 0, 'select': 0}
+  Estimated time complexity: O(n^1)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'get_features': 'No recursion', 'k_center_greedy': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: lfosa.py
+  Total number of loops: 3
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'select': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: coreset.py
+  Total number of loops: 4
+  Maximum loop nesting level: 1
+  Recursive calls in each function: {'__init__': 0, 'get_features': 0, 'k_center_greedy': 0, 'select': 0}
+  Estimated time complexity: O(n^1)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'get_features': 'No recursion', 'k_center_greedy': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: uncertainty.py
+  Total number of loops: 3
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'run': 0, 'rank_uncertainty': 0, 'select': 0, 'predict_prob_dropout_split': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'run': 'No recursion', 'rank_uncertainty': 'No recursion', 'select': 'No recursion', 'predict_prob_dropout_split': 'No recursion'}
+----------------------------------------
+File: epig.py
+  Total number of loops: 2
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'select': 0, 'rank_uncertainty': 0, 'conditional_epig_from_probs': 0, 'predict_prob_dropout_split': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion', 'rank_uncertainty': 'No recursion', 'conditional_epig_from_probs': 'No recursion', 'predict_prob_dropout_split': 'No recursion'}
+----------------------------------------
+File: learningloss.py
+  Total number of loops: 2
+  Maximum loop nesting level: 1
+  Recursive calls in each function: {'__init__': 0, 'run': 0, 'get_predloss': 0, 'select': 0}
+  Estimated time complexity: O(n^1)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'run': 'No recursion', 'get_predloss': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: __init__.py
+  Total number of loops: 0
+  Maximum loop nesting level: 0
+  Recursive calls in each function: {}
+  Estimated time complexity: O(1)
+  Estimated space complexity: O(1)
+  Recursion estimate details: {}
+----------------------------------------
+File: entropycb.py
+  Total number of loops: 5
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'rank_uncertainty': 0, 'select': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'rank_uncertainty': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: saal.py
+  Total number of loops: 8
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'collate_batch': 0, 'select': 0, 'run': 0, 'max_sharpness_acquisition_pseudo': 0, 'init_centers': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'collate_batch': 'No recursion', 'select': 'No recursion', 'run': 'No recursion', 'max_sharpness_acquisition_pseudo': 'No recursion', 'init_centers': 'No recursion'}
+----------------------------------------
+File: vessal.py
+  Total number of loops: 7
+  Maximum loop nesting level: 4
+  Recursive calls in each function: {'__init__': 0, 'inf_replace': 0, 'streaming_sampler': 0, 'get_valid_candidates': 0, 'select': 0, 'get_embedding': 0, 'get_exp_grad_embedding': 0}
+  Estimated time complexity: O(n^4)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'inf_replace': 'No recursion', 'streaming_sampler': 'No recursion', 'get_valid_candidates': 'No recursion', 'select': 'No recursion', 'get_embedding': 'No recursion', 'get_exp_grad_embedding': 'No recursion'}
+----------------------------------------
+File: ccal.py
+  Total number of loops: 5
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'get_label_i_loader': 0, 'select': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'get_label_i_loader': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: tidal.py
+  Total number of loops: 1
+  Maximum loop nesting level: 1
+  Recursive calls in each function: {'__init__': 0, 'select': 0, 'rank_uncertainty': 0, 'get_cumulative_entropy': 0}
+  Estimated time complexity: O(n^1)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion', 'rank_uncertainty': 'No recursion', 'get_cumulative_entropy': 'No recursion'}
+----------------------------------------
+File: eoal.py
+  Total number of loops: 8
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'select': 0, 'open_entropy': 0, 'lab_conv': 0, 'unknown_clustering': 0, 'calculate_cluster_centers': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion', 'open_entropy': 'No recursion', 'lab_conv': 'No recursion', 'unknown_clustering': 'No recursion', 'calculate_cluster_centers': 'No recursion'}
+----------------------------------------
+File: vaal.py
+  Total number of loops: 4
+  Maximum loop nesting level: 3
+  Recursive calls in each function: {'__init__': 0, 'run': 0, 'select': 0, 'train_vaal': 0, 'pred_dis_score_vaal': 0, 'vae_loss': 0}
+  Estimated time complexity: O(n^3)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'run': 'No recursion', 'select': 'No recursion', 'train_vaal': 'No recursion', 'pred_dis_score_vaal': 'No recursion', 'vae_loss': 'No recursion'}
+----------------------------------------
+File: uncertainty_backbone.py
+  Total number of loops: 1
+  Maximum loop nesting level: 1
+  Recursive calls in each function: {'__init__': 0, 'run': 0, 'rank_uncertainty': 0, 'select': 0}
+  Estimated time complexity: O(n^1)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'run': 'No recursion', 'rank_uncertainty': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: bemps_coremse.py
+  Total number of loops: 6
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'run': 0, 'rank_uncertainty': 0, 'pad_tensor_to_shape': 0, 'select': 0, 'predict_prob_dropout_split': 0, 'random_generator_for_x_prime': 0, 'clustering': 0, 'kmeans': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'run': 'No recursion', 'rank_uncertainty': 'No recursion', 'pad_tensor_to_shape': 'No recursion', 'select': 'No recursion', 'predict_prob_dropout_split': 'No recursion', 'random_generator_for_x_prime': 'No recursion', 'clustering': 'No recursion', 'kmeans': 'No recursion'}
+----------------------------------------
+File: alpha_mix_sampling.py
+  Total number of loops: 7
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'select': 0, 'find_alpha': 0, 'find_candidate_set': 0, 'calculate_optimum_alpha': 0, 'sample': 0, 'retrieve_anchor': 0, 'generate_alpha': 0, 'clamp_alpha': 0, 'learn_alpha': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion', 'find_alpha': 'No recursion', 'find_candidate_set': 'No recursion', 'calculate_optimum_alpha': 'No recursion', 'sample': 'No recursion', 'retrieve_anchor': 'No recursion', 'generate_alpha': 'No recursion', 'clamp_alpha': 'No recursion', 'learn_alpha': 'No recursion'}
+----------------------------------------
+File: similar.py
+  Total number of loops: 0
+  Maximum loop nesting level: 0
+  Recursive calls in each function: {'__init__': 0, 'get_SCMI_indice': 0, 'select': 0}
+  Estimated time complexity: O(1)
+  Estimated space complexity: O(1)
+  Recursion estimate details: {'__init__': 'No recursion', 'get_SCMI_indice': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: pal.py
+  Total number of loops: 4
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'compute_S_ID': 0, 'get_sequence': 0, 'get_sequence_back': 0, '__init__': 0, 'select': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'compute_S_ID': 'No recursion', 'get_sequence': 'No recursion', 'get_sequence_back': 'No recursion', '__init__': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
+File: neat.py
+  Total number of loops: 11
+  Maximum loop nesting level: 2
+  Recursive calls in each function: {'__init__': 0, 'select': 0, 'cosDistance_two': 0, 'CIFAR100_EXTRACT_FEATURE_CLIP_new': 0, 'get_features': 0, 'active_learning_5': 0}
+  Estimated time complexity: O(n^2)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion', 'cosDistance_two': 'No recursion', 'CIFAR100_EXTRACT_FEATURE_CLIP_new': 'No recursion', 'get_features': 'No recursion', 'active_learning_5': 'No recursion'}
+----------------------------------------
+File: noise_stability.py
+  Total number of loops: 6
+  Maximum loop nesting level: 1
+  Recursive calls in each function: {'__init__': 0, 'add_noise_to_weights': 0, 'backup_and_add_noise': 0, 'restore_weights': 0, 'run': 0, 'select': 0, 'kcenter_greedy': 0, 'get_all_outputs': 0}
+  Estimated time complexity: O(n^1)
+  Estimated space complexity: O(n) (due to recursive calls and local variables)
+  Recursion estimate details: {'__init__': 'No recursion', 'add_noise_to_weights': 'No recursion', 'backup_and_add_noise': 'No recursion', 'restore_weights': 'No recursion', 'run': 'No recursion', 'select': 'No recursion', 'kcenter_greedy': 'No recursion', 'get_all_outputs': 'No recursion'}
+----------------------------------------
+File: random.py
+  Total number of loops: 0
+  Maximum loop nesting level: 0
+  Recursive calls in each function: {'__init__': 0, 'select': 0}
+  Estimated time complexity: O(1)
+  Estimated space complexity: O(1)
+  Recursion estimate details: {'__init__': 'No recursion', 'select': 'No recursion'}
+----------------------------------------
