@@ -22,14 +22,27 @@ class LFOSA(ALMethod):
             S_ij = {}
             batch_num = len(selection_loader)
             for i, data in enumerate(selection_loader):
-                inputs = data[0].to(self.args.device)
-                if i % self.args.print_freq == 0:
-                    print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
-                
-                labels = data[1]
-                index = data[2]
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    input_ids = data['input_ids'].to(self.args.device)
+                    attention_mask = data['attention_mask'].to(self.args.device)
+                    outputs = self.models['ood_detection'](input_ids=input_ids, attention_mask=attention_mask)
+                    outputs = outputs.logits # logists
+                    labels = data['labels']
+                    index = data['index']
+                    # hidden_states = outputs.hidden_states
+                    # last_hidden_state = hidden_states[-1]
+                    # features = last_hidden_state[:, 0, :]
 
-                outputs, _ = self.models['ood_detection'](inputs)
+                else: # for images
+                    inputs = data[0].to(self.args.device)
+                    if i % self.args.print_freq == 0:
+                        print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
+                    
+                    labels = data[1]
+                    index = data[2]
+
+                    outputs, _ = self.models['ood_detection'](inputs)
+
                 labelArr += list(np.array(labels.cpu().data))
                 # activation value based
                 v_ij, predicted = outputs.max(1)
@@ -53,9 +66,9 @@ class LFOSA(ALMethod):
             gmm = GaussianMixture(n_components=2, max_iter=10, tol=1e-2, reg_covar=5e-4)
             gmm.fit(np.array(activation_value).reshape(-1, 1))
             prob = gmm.predict_proba(np.array(activation_value).reshape(-1, 1))
-            # 得到为known类别的概率
+            # The probability of getting for the 'known' category
             prob = prob[:, gmm.means_.argmax()]
-            # 如果为unknown类别直接为0
+            # If the category is UNKNOWN, it is 0
             if tmp_class == self.args.num_IN_class:
                 prob = [0]*len(prob)
                 prob = np.array(prob)

@@ -87,7 +87,7 @@ parser.add_argument('--data_path', type=str, default='data', help='dataset path'
 parser.add_argument('--gpu', default=[0], nargs="+", type=list, help='GPU id to use')
 parser.add_argument("--data-parallel", default=False, type=str_to_bool, help="whether parallel or not")
 parser.add_argument('--ood-rate', type=float, default=0.6, metavar='N', help='OOD rate in unlabeled set')
-parser.add_argument('--n-class', type=str, default=10, help='# of classes')
+parser.add_argument('--n-class', type=int, default=10, help='# of classes') # originally str
 parser.add_argument('--trial', type=int, default=5, help='# of runs')
 parser.add_argument('--cycle', type=int, default=10, help='# of AL cycles')
 parser.add_argument('--n-query', type=int, default=1000, help='# of query samples')

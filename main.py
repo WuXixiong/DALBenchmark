@@ -93,8 +93,12 @@ if __name__ == '__main__':
 
             # for LFOSA and EOAL...
             criterion_xent = nn.CrossEntropyLoss()
-            criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=512, use_gpu=True) # feat_dim = first dim of feature (output,feature from model return)
-            optimizer_centloss = torch.optim.SGD(criterion_cent.parameters(), lr=args.lr_cent)
+            if args.dataset in ['AGNEWS', 'IMDB', 'SST5']: # text dataset
+                criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=768, use_gpu=True) # feat_dim = first dim of
+                optimizer_centloss = torch.optim.AdamW(criterion_cent.parameters(), lr=0.005)
+            else: # for images
+                criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=512, use_gpu=True) # feat_dim = first dim of feature (output,feature from model return)
+                optimizer_centloss = torch.optim.SGD(criterion_cent.parameters(), lr=args.lr_cent)
             # PAL wnet
             ood_num = (args.num_IN_class+1)*2
             wnet, optimizer_wnet = set_Wnet(args, ood_num)
@@ -123,7 +127,10 @@ if __name__ == '__main__':
             print('Trial {}/{} || Cycle {}/{} || Labeled IN size {}: Test acc {}'.format(
                     trial + 1, args.trial, cycle + 1, args.cycle, len(I_index), acc), flush=True)
             if args.method in ['LFOSA', 'EOAL', 'PAL']:
-                ood_acc = test_ood(args, models, dataloaders)
+                if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    ood_acc = test_ood_nlp(args, models, dataloaders)
+                else:
+                    ood_acc = test_ood(args, models, dataloaders)
                 print('Out of domain detection acc is {}'.format(ood_acc), flush=True)
 
             #### AL Query ####
