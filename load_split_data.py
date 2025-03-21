@@ -4,21 +4,22 @@ import torch
 import math
 import random
 from torch.utils.data.dataset import Subset
-from datasets.tinyimagenet import MyTinyImageNet
-from datasets.cifar10 import MyCIFAR10
-from datasets.cifar100 import MyCIFAR100
-from datasets.imagenet import MyImageNet
-from datasets.mnist import MyMNIST
-from datasets.svhn import MySVHN
-from datasets.agnews import MyAGNewsDataset
-from datasets.imdb import MyIMDBDataset
-from datasets.sst5 import MySST5Dataset
+from ownDatasets.tinyimagenet import MyTinyImageNet
+from ownDatasets.cifar10 import MyCIFAR10
+from ownDatasets.cifar100 import MyCIFAR100
+from ownDatasets.imagenet import MyImageNet
+from ownDatasets.mnist import MyMNIST
+from ownDatasets.svhn import MySVHN
+from ownDatasets.agnews import MyAGNewsDataset
+from ownDatasets.imdb import MyIMDBDataset
+from ownDatasets.sst5 import MySST5Dataset
 from torchvision import datasets
 import torchvision.transforms as T
 from transformers import DistilBertTokenizer
 from transformers import RobertaTokenizer
 import os
 from tqdm import tqdm
+from datasets import load_dataset
 
 CIFAR10_SUPERCLASS = list(range(10))  # one class
 CIFAR100_SUPERCLASS = [
@@ -96,10 +97,14 @@ def get_dataset(args, trial):
 
     # Dataset loading
     if args.dataset == 'CIFAR10':
-        file_path = args.data_path + '/cifar10/'
-        train_set = MyCIFAR10(file_path, train=True, download=True, transform=train_transform)
-        unlabeled_set = MyCIFAR10(file_path, train=True, download=True, transform=test_transform)
-        test_set = MyCIFAR10(file_path, train=False, download=True, transform=test_transform)
+        #file_path = args.data_path + '/cifar10/'
+        cifar10_dataset = load_dataset('cifar10')
+        train_set = MyCIFAR10(cifar10_dataset['train'], transform=train_transform)
+        unlabeled_set = MyCIFAR10(cifar10_dataset['train'], transform=test_transform)
+        test_set = MyCIFAR10(cifar10_dataset['test'], transform=test_transform)
+        # train_set = MyCIFAR10(file_path, train=True, download=True, transform=train_transform)
+        # unlabeled_set = MyCIFAR10(file_path, train=True, download=True, transform=test_transform)
+        # test_set = MyCIFAR10(file_path, train=False, download=True, transform=test_transform)
     elif args.dataset == 'CIFAR100':
         file_path = args.data_path + '/cifar100/'
         train_set = MyCIFAR100(file_path, train=True, download=True, transform=train_transform)
@@ -147,14 +152,15 @@ def get_dataset(args, trial):
         
         # Initialize datasets for training, validation, and testing
         if args.dataset == 'SST5':
-            file_path = args.data_path + '/sst5/'
-            train_set = MySST5Dataset(file_path+'train.tsv', tokenizer=tokenizer, max_length=128)
-            test_set = MySST5Dataset(file_path+'test.tsv', tokenizer=tokenizer, max_length=128)
-            unlabeled_set = MySST5Dataset(file_path+'train.tsv', tokenizer=tokenizer, max_length=128)
+            dataset = load_dataset('SetFit/sst5')
+            train_set = MySST5Dataset(dataset['train'], tokenizer)
+            test_set = MySST5Dataset(dataset['test'], tokenizer)
+            unlabeled_set = MySST5Dataset(dataset['train'], tokenizer)
         elif args.dataset == 'IMDB':
-            train_set = MyIMDBDataset(split='train', tokenizer=tokenizer, max_length=128)
-            test_set = MyIMDBDataset(split='test', tokenizer=tokenizer, max_length=128)
-            unlabeled_set = MyIMDBDataset(split='train', tokenizer=tokenizer, max_length=128)
+            imdb_dataset = load_dataset('imdb')
+            train_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, max_length=128)
+            test_set = MyIMDBDataset(imdb_dataset['test'], tokenizer=tokenizer, max_length=128)
+            unlabeled_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, max_length=128)
         else: # AGNEWS
             train_set = MyAGNewsDataset(split='train', tokenizer=tokenizer, max_length=128)
             test_set = MyAGNewsDataset(split='test', tokenizer=tokenizer, max_length=128)

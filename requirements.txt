@@ -178,3 +178,4 @@ zipp==3.17.0
 seaborn==0.13.2
 tensorboard==2.18.0
 transformers==4.46.2
+datasets==3.4.1

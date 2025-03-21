@@ -520,10 +520,10 @@ def train_epoch_lfosa_nlp(args, models, criterion, optimizers, dataloaders, crit
         labels = data['labels'].to(args.device)
 
         # Zero the gradients
-        optimizers['backbone'].zero_grad()
+        optimizers['ood_detection'].zero_grad()
 
         # Forward pass
-        outputs = models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+        outputs = models['ood_detection'](input_ids=input_ids, attention_mask=attention_mask)
         hidden_states = outputs.hidden_states
         last_hidden_state = hidden_states[-1]
         features = last_hidden_state[:, 0, :]
@@ -945,77 +945,81 @@ def test(args, models, dataloaders):
 
 def test_nlp(args, models, dataloaders):
     top1 = AverageMeter('Acc@1', ':6.2f')
-
     # Switch to evaluation mode
     models['backbone'].eval()
-
-    with torch.no_grad():
+    
+    with torch.no_grad():  # Only need one torch.no_grad() block
         for i, data in enumerate(dataloaders['test']):
             # Extract and move data to the correct device
             input_ids = data['input_ids'].to(args.device)
             attention_mask = data['attention_mask'].to(args.device)
             labels = data['labels'].to(args.device)
-
+            
             # Compute output
-            with torch.no_grad():
-                if args.method == 'TIDAL':
-                    scores, _, _ = models['backbone'](
-                        input_ids=input_ids, attention_mask=attention_mask, method='TIDAL'
-                    )
-                else:
-                    scores = models['backbone'](
-                        input_ids=input_ids, attention_mask=attention_mask
-                    ).logits  # Get logits from BertForSequenceClassification
-
+            if args.method == 'TIDAL':
+                scores, _, _ = models['backbone'](
+                    input_ids=input_ids, 
+                    attention_mask=attention_mask, 
+                    method='TIDAL'
+                )
+            else:
+                scores = models['backbone'](
+                    input_ids=input_ids, 
+                    attention_mask=attention_mask
+                ).logits  # Get logits from BertForSequenceClassification
+            
             # Measure accuracy and record loss
             prec1 = accuracy(scores.data, labels, topk=(1,))[0]
             top1.update(prec1.item(), input_ids.size(0))
-
-        print('Test acc: * Prec@1 {top1.avg:.3f}'.format(top1=top1))
-
+    
+    print(f'Test acc: * Prec@1 {top1.avg:.3f}')
     return top1.avg
+
 
 def test_ood(args, models, dataloaders):
     top1 = AverageMeter('Acc@1', ':6.2f')
-
     # Switch to evaluate mode
     models['ood_detection'].eval()
+    
     with torch.no_grad():
         for i, data in enumerate(dataloaders['test']):
             inputs, labels = data[0].to(args.device), data[1].to(args.device)
-
+            
             # Compute output
-            with torch.no_grad():
-                scores, _ = models['ood_detection'](inputs)
-
+            scores, _ = models['ood_detection'](inputs)
+            
             # Measure accuracy and record loss
             prec1 = accuracy(scores.data, labels, topk=(1,))[0]
             top1.update(prec1.item(), inputs.size(0))
-        print('Test acc: * Prec@1 {top1.avg:.3f}'.format(top1=top1))
-
+    
+    print(f'Test acc: * Prec@1 {top1.avg:.3f}')
     return top1.avg
+
 
 def test_ood_nlp(args, models, dataloaders):
     top1 = AverageMeter('Acc@1', ':6.2f')
-
     # Switch to evaluate mode
     models['ood_detection'].eval()
+    
     with torch.no_grad():
-        for _, data in enumerate(dataloaders['test']):
-            labels = data['labels'].to(args.device)
-            # inputs, labels = data[0].to(args.device), data[1].to(args.device)
-                        # Extract input_ids, attention_mask, and labels from the dictionary
+        for i, data in enumerate(dataloaders['test']):
+            # Extract input_ids, attention_mask, and labels from the dictionary
             input_ids = data['input_ids'].to(args.device)
             attention_mask = data['attention_mask'].to(args.device)
-            outputs = models['ood_detection'](input_ids=input_ids, attention_mask=attention_mask)
+            labels = data['labels'].to(args.device)
+            
+            # Compute output
+            outputs = models['ood_detection'](
+                input_ids=input_ids,
+                attention_mask=attention_mask
+            )
             scores = outputs.logits
-
-
+            
             # Measure accuracy and record loss
             prec1 = accuracy(scores.data, labels, topk=(1,))[0]
             top1.update(prec1.item(), input_ids.size(0))
-        print('Test acc: * Prec@1 {top1.avg:.3f}'.format(top1=top1))
-
+    
+    print(f'Test acc: * Prec@1 {top1.avg:.3f}')
     return top1.avg
 
 class AverageMeter(object):
