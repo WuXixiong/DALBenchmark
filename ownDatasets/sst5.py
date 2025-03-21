@@ -4,12 +4,12 @@ import torch
 class MySST5Dataset(Dataset):
     def __init__(self, hf_dataset, tokenizer, max_length=128):
         """
-        初始化 SST-5 数据集。
+        Initialize the SST-5 dataset.
 
-        参数：
-        hf_dataset (Dataset): Hugging Face 加载的数据集对象。
-        tokenizer (BertTokenizer): 用于文本编码的分词器。
-        max_length (int): 文本序列的最大长度（默认值：128）。
+        Args:
+        hf_dataset (Dataset): Hugging Face dataset object.
+        tokenizer (BertTokenizer): Tokenizer used for text encoding.
+        max_length (int): Maximum length of text sequences (default: 128).
         """
         self.tokenizer = tokenizer
         self.max_length = max_length
@@ -19,13 +19,13 @@ class MySST5Dataset(Dataset):
 
     def __getitem__(self, index):
         """
-        根据索引获取样本。
+        Get a sample by index.
 
-        参数：
-        index (int): 样本的索引。
+        Args:
+        index (int): Index of the sample.
 
-        返回：
-        dict: 包含 input_ids、attention_mask、labels 和 index 的字典。
+        Returns:
+        dict: A dictionary containing input_ids, attention_mask, labels, and index.
         """
         text = self.data[index]
         label = self.targets[index]
@@ -50,9 +50,9 @@ class MySST5Dataset(Dataset):
 
     def __len__(self):
         """
-        返回数据集的样本数量。
+        Return the number of samples in the dataset.
 
-        返回：
-        int: 样本数量。
+        Returns:
+        int: Number of samples.
         """
         return len(self.data)

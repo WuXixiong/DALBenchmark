@@ -47,7 +47,7 @@ if __name__ == '__main__':
         test_I_index = get_sub_test_dataset(args, test_dst)
 
         # DataLoaders
-        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5']: # ADD MNIST
+        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TinyImageNet']: # ADD MNIST
             sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
             sampler_test = SubsetSequentialSampler(test_I_index)
             train_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
@@ -60,11 +60,6 @@ if __name__ == '__main__':
                 ood_dataloader = DataLoader(train_dst, sampler=sampler_ood, batch_size=args.batch_size, num_workers=args.workers)
                 sampler_unlabeled = SubsetRandomSampler(U_index)
                 unlabeled_loader = DataLoader(train_dst, sampler=sampler_unlabeled, batch_size=args.batch_size, num_workers=args.workers)
-        elif args.dataset == 'ImageNet50' or args.dataset == 'TinyImageNet': # DataLoaderX for efficiency
-            dst_subset = torch.utils.data.Subset(train_dst, I_index)
-            dst_test = torch.utils.data.Subset(test_dst, test_I_index)
-            train_loader = DataLoaderX(dst_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=False)
-            test_loader = DataLoaderX(dst_test, batch_size=args.test_batch_size, shuffle=False, num_workers=args.workers, pin_memory=False)
         dataloaders = {'train': train_loader, 'test': test_loader}
 
         if args.method in ['LFOSA', 'EOAL', 'PAL']:
@@ -171,7 +166,7 @@ if __name__ == '__main__':
                 models = meta_train(args, models, optimizers, schedulers, criterion, dataloaders['train'], unlabeled_loader, delta_loader)
 
             # Update trainloader
-            if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5']:
+            if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TinyImageNet']:
                 sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
                 dataloaders['train'] = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
                 if args.method in ['LFOSA', 'EOAL', 'PAL']:
@@ -180,10 +175,6 @@ if __name__ == '__main__':
                     dataloaders['query'] = DataLoader(train_dst, sampler=sampler_query, batch_size=args.batch_size, num_workers=args.workers)
                     ood_query = SubsetRandomSampler(O_index)  # make indices initial to the samples
                     dataloaders['ood'] = DataLoader(train_dst, sampler=ood_query, batch_size=args.batch_size, num_workers=args.workers)
-            elif args.dataset == 'ImageNet50' or args.dataset == 'TinyImageNet':
-                dst_subset = torch.utils.data.Subset(train_dst, I_index)
-                train_loader = DataLoaderX(dst_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=False)
-                dataloaders['train'] = train_loader
 
             # Log cycle information
             log_cycle_info(logs, cycle, acc, in_cnt, class_counts)

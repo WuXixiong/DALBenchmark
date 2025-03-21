@@ -1,30 +1,25 @@
 from torch.utils.data import Dataset
-from torchtext.datasets import AG_NEWS
-import numpy as np
 import torch
 
 class MyAGNewsDataset(Dataset):
-    def __init__(self, split, tokenizer, max_length=128):
+    def __init__(self, hf_dataset, tokenizer, max_length=128):
         """
-        Initialize the AGNews dataset.
+        Initialize the AG News dataset.
 
         Args:
-        split (str): Dataset split, either "train" or "test".
-        tokenizer (BertTokenizer): Tokenizer for text encoding.
-        max_length (int): Maximum length for text sequences (default: 128).
+        hf_dataset (Dataset): Hugging Face dataset object.
+        tokenizer (BertTokenizer): Tokenizer used for text encoding.
+        max_length (int): Maximum length of text sequences (default: 128).
         """
-        self.ag_news = list(AG_NEWS(split=split))
         self.tokenizer = tokenizer
         self.max_length = max_length
-        
-        # Extract texts and labels
-        self.data = [text for label, text in self.ag_news]
-        self.targets = np.array([label - 1 for label, _ in self.ag_news])  # Convert labels to range 0-3
-        self.classes = ['World', 'Sports', 'Business', 'Sci/Tech']  # Corresponding class names
+        self.data = hf_dataset['text']
+        self.targets = torch.tensor(hf_dataset['label'], dtype=torch.long)
+        self.classes = ['World', 'Sports', 'Business', 'Sci/Tech']
 
     def __getitem__(self, index):
         """
-        Retrieve a sample by index.
+        Get a sample by index.
 
         Args:
         index (int): Index of the sample.
@@ -32,10 +27,9 @@ class MyAGNewsDataset(Dataset):
         Returns:
         dict: A dictionary containing input_ids, attention_mask, labels, and index.
         """
-        text = str(self.data[index])
+        text = self.data[index]
         label = self.targets[index]
-        
-        # Tokenize and encode the text
+
         encoding = self.tokenizer.encode_plus(
             text,
             add_special_tokens=True,
@@ -47,20 +41,18 @@ class MyAGNewsDataset(Dataset):
             return_tensors='pt',
         )
 
-        # return (encoding['input_ids'].flatten(), encoding['attention_mask'].flatten()),torch.tensor(label, dtype=torch.long),index 
         return {
-            'input_ids': encoding['input_ids'].flatten(),
-            'attention_mask': encoding['attention_mask'].flatten(),
-            'labels': torch.tensor(label, dtype=torch.long),
-            'index': index  # Return the sample index
+            'input_ids': encoding['input_ids'].squeeze(),
+            'attention_mask': encoding['attention_mask'].squeeze(),
+            'labels': label,
+            'index': index
         }
-    # return data, target, index
 
     def __len__(self):
         """
-        Return the total number of samples.
+        Return the number of samples in the dataset.
 
         Returns:
-        int: Number of samples in the dataset.
+        int: Number of samples.
         """
         return len(self.data)

@@ -68,7 +68,7 @@ class CoresetCB(ALMethod):
         return unlabeled_probs, labeled_features, unlabeled_features
 
     def k_center_greedy(self, labeled, unlabeled, n_query, probs):
-        num_classes = self.args.n_class
+        num_classes = self.args.num_IN_class
         if self.args.dataset == 'CIFAR10':
             lamda = 5
         elif self.args.dataset == 'CIFAR100':

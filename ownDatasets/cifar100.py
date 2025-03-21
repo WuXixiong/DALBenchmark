@@ -1,17 +1,70 @@
-from torchvision import datasets
-from torch.utils.data.dataset import Dataset
+from torch.utils.data import Dataset 
 import numpy as np
 
 class MyCIFAR100(Dataset):
-    def __init__(self, file_path, train, download, transform):
-        self.cifar100 = datasets.CIFAR100(file_path, train=train, download=download, transform=transform)
-        self.targets = np.array(self.cifar100.targets)
-        self.classes = self.cifar100.classes
+    def __init__(self, hf_dataset, transform=None, imbalance_factor=None, method=None, n_class=100):
+        """
+        Initialize the CIFAR-100 dataset.
+        
+        Args:
+        hf_dataset (Dataset): Hugging Face dataset object.
+        transform (callable, optional): Function to preprocess the images.
+        imbalance_factor (float, optional): Imbalance factor for the dataset.
+        method (str, optional): Name of the method to be used.
+        n_class (int): Number of classes, default is 100.
+        """
+        self.data = hf_dataset['img']
+        self.targets = np.array(hf_dataset['fine_label'])  # Changed from 'label' to 'fine_label'
+        self.transform = transform
+        self.classes = hf_dataset.features['fine_label'].names  # Changed from 'label' to 'fine_label'
+        
+        if method == 'TIDAL':
+            self.moving_prob = np.zeros((len(self.data), n_class), dtype=np.float32)
+        
+        if imbalance_factor:
+            # Create imbalance ratios
+            imbalance_ratios = np.logspace(np.log10(imbalance_factor), 0, num=n_class)[::-1]
+            
+            # Get indices for each class
+            train_idx_per_class = [np.where(self.targets == i)[0] for i in range(n_class)]
+            
+            # Resample based on indices
+            new_indices = []
+            for class_idx, class_indices in enumerate(train_idx_per_class):
+                n_samples = int(len(class_indices) * imbalance_ratios[class_idx])
+                new_indices.extend(np.random.choice(class_indices, n_samples, replace=False))
+            
+            # Create imbalanced training dataset
+            self.data = [self.data[i] for i in new_indices]
+            self.targets = self.targets[new_indices]
 
     def __getitem__(self, index):
-        data, _ = self.cifar100[index]
+        """
+        Get a sample by index.
+
+        Args:
+        index (int): Index of the sample.
+
+        Returns:
+        tuple: (image, label, index, [moving probability])
+        """
+        img = self.data[index]
         target = self.targets[index]
-        return data, target, index
+
+        if self.transform:
+            img = self.transform(img)
+
+        if hasattr(self, 'moving_prob'):
+            moving_prob = self.moving_prob[index]
+            return img, target, index, moving_prob
+
+        return img, target, index
 
     def __len__(self):
-        return len(self.cifar100)
+        """
+        Return the number of samples in the dataset.
+
+        Returns:
+        int: Number of samples.
+        """
+        return len(self.data)

@@ -557,6 +557,31 @@ def get_dataset(args, trial):
             in_classes = np.unique(test_set.targets[in_mask])
             print(f"测试集 IN 样本: {in_count}, 类别: {in_classes}")
             print(f"测试集 OOD 样本: {ood_count}")
+    # elif args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+    #     # Reporting for text datasets
+    #     uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
+    #     print("Train, # samples per class")
+    #     print(uni, cnt)
+        
+    #     # Separate reporting for in-distribution and OOD classes
+    #     in_mask = np.array([t < args.num_IN_class for t in unlabeled_set.targets])
+    #     ood_mask = np.array([t == args.num_IN_class for t in unlabeled_set.targets])
+        
+    #     in_count = np.sum(in_mask)
+    #     ood_count = np.sum(ood_mask)
+    #     print(f"Train IN samples: {in_count}, OOD samples: {ood_count}")
+        
+    #     uni, cnt = np.unique(np.array(test_set.targets), return_counts=True)
+    #     print("Test, # samples per class")
+    #     print(uni, cnt)
+        
+    #     # Separate reporting for test in-distribution and OOD classes
+    #     in_mask = np.array([t < args.num_IN_class for t in test_set.targets])
+    #     ood_mask = np.array([t == args.num_IN_class for t in test_set.targets])
+        
+    #     in_count = np.sum(in_mask)
+    #     ood_count = np.sum(ood_mask)
+    #     print(f"Test IN samples: {in_count}, OOD samples: {ood_count}")
     
     return train_set, unlabeled_set, test_set
 

@@ -53,9 +53,9 @@ class EntropyCB(ALMethod):
         else:
             labelled_classes = [labelled_subset[i][1] for i in range(len(labelled_subset))]
         _, counts = np.unique(labelled_classes, return_counts=True)
-        class_threshold=int((2*self.args.n_query+(self.cur_cycle+1)*self.args.n_query)/int(self.args.n_class))
+        class_threshold=int((2*self.args.n_query+(self.cur_cycle+1)*self.args.n_query)/int(self.args.num_IN_class))
         class_share=class_threshold-counts
-        samples_share= np.array([0 if c<0 else c for c in class_share]).reshape(int(self.args.n_class),1)
+        samples_share= np.array([0 if c<0 else c for c in class_share]).reshape(int(self.args.num_IN_class),1)
         if self.args.dataset == 'CIFAR10':
             lamda=0.6
         elif self.args.dataset == 'CIFAR100':
@@ -70,7 +70,6 @@ class EntropyCB(ALMethod):
 
             z=cp.Variable((N,1),boolean=True)
             constraints = [sum(z) == b]
-            # probs in CB is preds in MQNet
             cost = z.T @ U + lam * cp.norm1(preds.T @ z - samples_share)
             objective = cp.Minimize(cost)
             problem = cp.Problem(objective, constraints)
@@ -84,7 +83,7 @@ class EntropyCB(ALMethod):
 			# -----------------Stats of optimization---------------------------------
             # reset the variables as mqnet's
             n = self.args.n_query
-            num_classes = int(self.args.n_class)
+            num_classes = int(self.args.num_IN_class)
 
             ENT_Loss.append(np.matmul(z.value.T, U))
             print('ENT LOSS= ', ENT_Loss)

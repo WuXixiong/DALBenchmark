@@ -1152,10 +1152,10 @@ def get_models(args, nets, model, models):
             if args.method == 'EOAL':
                 # Initialize an extra classification module for EOAL.
                 model_bc = nets.eoalnet.ResClassifier_MME(
-                    num_classes=2 * int(args.n_class), norm=False, input_size=512)
+                    num_classes=2 * int(args.num_IN_class), norm=False, input_size=512)
                 models['model_bc'] = prepare_model(model_bc)
         else:
-            backbone = prepare_model(load_text_model(args.n_class))
+            backbone = prepare_model(load_text_model(args.num_IN_class))
             models = {'backbone': backbone}
         return models
 

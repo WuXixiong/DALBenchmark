@@ -1,56 +1,70 @@
-from torchvision import datasets, transforms
-import torchvision.transforms as T
-from torch.utils.data import Dataset, DataLoader
-from torchvision.datasets import ImageFolder
-from torch import tensor, long
+from torch.utils.data import Dataset
 import numpy as np
 
 class MyTinyImageNet(Dataset):
-    def __init__(self, file_path, transform=None):
+    def __init__(self, hf_dataset, transform=None, imbalance_factor=None, method=None, n_class=200):
+        """
+        Initialize the TinyImageNet dataset.
+        
+        Args:
+        hf_dataset (Dataset): Hugging Face dataset object.
+        transform (callable, optional): Function to preprocess the images.
+        imbalance_factor (float, optional): Imbalance factor for the dataset.
+        method (str, optional): Name of the method to be used.
+        n_class (int): Number of classes, default is 200.
+        """
+        self.data = hf_dataset['image']  # Changed from 'img' to 'image'
+        self.targets = np.array(hf_dataset['label'])  # This is correct
         self.transform = transform
-        self.data = ImageFolder(file_path)
-        self.targets = np.array(self.data.targets)
-        self.classes = self.data.classes
+        self.classes = hf_dataset.features['label'].names  # This is correct
+        
+        if method == 'TIDAL':
+            self.moving_prob = np.zeros((len(self.data), n_class), dtype=np.float32)
+        
+        if imbalance_factor:
+            # Create imbalance ratios
+            imbalance_ratios = np.logspace(np.log10(imbalance_factor), 0, num=n_class)[::-1]
+            
+            # Get indices for each class
+            train_idx_per_class = [np.where(self.targets == i)[0] for i in range(n_class)]
+            
+            # Resample based on indices
+            new_indices = []
+            for class_idx, class_indices in enumerate(train_idx_per_class):
+                n_samples = int(len(class_indices) * imbalance_ratios[class_idx])
+                new_indices.extend(np.random.choice(class_indices, n_samples, replace=False))
+            
+            # Create imbalanced training dataset
+            self.data = [self.data[i] for i in new_indices]
+            self.targets = self.targets[new_indices]
 
     def __getitem__(self, index):
-        img, _ = self.data[index]
+        """
+        Get a sample by index.
+
+        Args:
+        index (int): Index of the sample.
+
+        Returns:
+        tuple: (image, label, index, [moving probability])
+        """
+        img = self.data[index]
         target = self.targets[index]
 
-        if self.transform is not None:
+        if self.transform:
             img = self.transform(img)
+
+        if hasattr(self, 'moving_prob'):
+            moving_prob = self.moving_prob[index]
+            return img, target, index, moving_prob
 
         return img, target, index
 
     def __len__(self):
+        """
+        Return the number of samples in the dataset.
+
+        Returns:
+        int: Number of samples.
+        """
         return len(self.data)
-
-# Update augmentation function for 64x64 images
-def get_augmentations_64(T_normalize):
-    train_transform = T.Compose([T.RandomHorizontalFlip(), T.RandomCrop(size=64, padding=4), T.ToTensor(), T_normalize])
-    test_transform = T.Compose([T.ToTensor(), T_normalize])
-    return train_transform, test_transform
-
-# TinyImageNet-specific dataset handling
-def TinyImageNet(args):
-    channel = 3
-    im_size = (64, 64)  # TinyImageNet image size
-    num_classes = 200   # TinyImageNet has 200 classes
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-    T_normalize = T.Normalize(mean, std)
-
-    # Get transforms specific to 64x64 images
-    train_transform, test_transform = get_augmentations_64(T_normalize)
-
-    # Load datasets from TinyImageNet paths
-    dst_train = MyTinyImageNet(args.data_path+'/tiny-imagenet-200/train/', transform=train_transform)
-    dst_test = MyTinyImageNet(args.data_path+'/tiny-imagenet-200/val/', transform=test_transform)
-
-    # Get class names from the dataset
-    class_names = dst_train.classes
-
-    # Convert targets to tensors
-    dst_train.targets = tensor(dst_train.targets, dtype=long)
-    dst_test.targets = tensor(dst_test.targets, dtype=long)
-
-    return channel, im_size, num_classes, class_names, mean, std, dst_train, dst_test
