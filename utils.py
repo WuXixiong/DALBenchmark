@@ -1007,7 +1007,7 @@ def test_ood_nlp(args, models, dataloaders):
                         # Extract input_ids, attention_mask, and labels from the dictionary
             input_ids = data['input_ids'].to(args.device)
             attention_mask = data['attention_mask'].to(args.device)
-            outputs = models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+            outputs = models['ood_detection'](input_ids=input_ids, attention_mask=attention_mask)
             scores = outputs.logits
 
 
@@ -1141,8 +1141,8 @@ def get_models(args, nets, model, models):
 
         # If the method requires OOD detection (and model_bc for EOAL)
         if args.method in ['LFOSA', 'EOAL', 'PAL']:
-            backbone = prepare_model(load_text_model(args.n_class))
-            ood_detection = prepare_model(load_text_model(args.n_class + 1))
+            backbone = prepare_model(load_text_model(args.num_IN_class))
+            ood_detection = prepare_model(load_text_model(args.num_IN_class + 1))
             models = {'backbone': backbone, 'ood_detection': ood_detection}
             
             if args.method == 'EOAL':
@@ -1457,112 +1457,6 @@ def init_mqnet(args, nets, models, optimizers, schedulers):
     optimizers['mqnet'] = optim_mqnet
     schedulers['mqnet'] = sched_mqnet
     return models, optimizers, schedulers
-
-# def get_optim_configurations(args, models):
-#     print("lr: {}, momentum: {}, decay: {}".format(args.lr, args.momentum, args.weight_decay))
-#     criterion = nn.CrossEntropyLoss(reduction='none').to(args.device)
-
-#     # Optimizer
-#     if args.optimizer == "SGD":
-#         optimizer = torch.optim.SGD(models['backbone'].parameters(), args.lr, momentum=args.momentum,
-#                                     weight_decay=args.weight_decay)
-#         if args.method =='TIDAL':
-#             optimizer = torch.optim.SGD(models['backbone'].parameters(), args.lr, momentum=args.momentum,
-#                                     weight_decay=args.weight_decay)
-#             optim_module = torch.optim.SGD(models['module'].parameters(), lr=args.lr,
-#                                          momentum=args.momentum, weight_decay=args.weight_decay)
-#         if args.method in ['LFOSA', 'EOAL', 'PAL']:
-#             optimizer_ood = torch.optim.SGD(models['ood_detection'].parameters(), args.lr, momentum=args.momentum,
-#                                     weight_decay=args.weight_decay)
-#             if args.method == 'EOAL':
-#                 params_bc = list(models['model_bc'].parameters())
-#                 optim_C = torch.optim.SGD(params_bc, lr=args.lr_model, momentum=0.9, weight_decay=0.0005, nesterov=True)
-#     elif args.optimizer == "Adam":
-#         optimizer = torch.optim.Adam(models['backbone'].parameters(), args.lr, weight_decay=args.weight_decay)
-#         if args.method in ['LFOSA', 'EOAL', 'PAL']:
-#             optimizer_ood = torch.optim.SGD(models['ood_detection'].parameters(), args.lr, momentum=args.momentum,
-#                                     weight_decay=args.weight_decay)
-#             if args.method == 'EOAL':
-#                 params_bc = list(models['model_bc'].parameters())
-#                 optim_C = torch.optim.SGD(params_bc, lr=args.lr_model, momentum=0.9, weight_decay=0.0005, nesterov=True)
-#     elif args.optimizer == "AdamW":
-#         optimizer = torch.optim.AdamW(models['backbone'].parameters(), args.lr, weight_decay=args.weight_decay)
-#     else:
-#         optimizer = torch.optim.__dict__[args.optimizer](models['backbone'].parameters(), args.lr, momentum=args.momentum,
-#                                                          weight_decay=args.weight_decay)
-#         if args.method in ['LFOSA', 'EOAL', 'PAL']:
-#             optimizer_ood = torch.optim.AdamW(models['ood_detection'].parameters(), args.lr, momentum=args.momentum,
-#                                     weight_decay=args.weight_decay)
-#             if args.method == 'EOAL':
-#                 params_bc = list(models['model_bc'].parameters())
-#                 optim_C = torch.optim.AdamW(params_bc, lr=args.lr_model, momentum=0.9, weight_decay=0.0005, nesterov=True)
-
-#     # LR scheduler
-#     if args.scheduler == "CosineAnnealingLR":
-#         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=args.min_lr)
-#         if args.method in ['LFOSA', 'EOAL', 'PAL']:
-#             scheduler_ood = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_ood, args.epochs, eta_min=args.min_lr)
-#     elif args.scheduler == "StepLR":
-#         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
-#         if args.method in ['LFOSA', 'EOAL', 'PAL']:
-#             scheduler_ood = torch.optim.lr_scheduler.StepLR(optimizer_ood, step_size=args.step_size, gamma=args.gamma)
-#     elif args.scheduler == "MultiStepLR":
-#         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestone)
-#         if args.method in ['LFOSA', 'EOAL', 'PAL']:
-#             scheduler_ood = torch.optim.lr_scheduler.MultiStepLR(optimizer_ood, milestones=args.milestone)
-#     else:
-#         scheduler = torch.optim.lr_scheduler.__dict__[args.scheduler](optimizer)
-#         if args.method in ['LFOSA', 'EOAL', 'PAL']:
-#             scheduler_ood = torch.optim.lr_scheduler.__dict__[args.scheduler](optimizer_ood)
-
-#     # Normal
-#     if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 'noise_stability', 'SAAL', 'VESSAL', 'corelog', 'coremse']: # also add new methods
-#         optimizers = {'backbone': optimizer}
-#         schedulers = {'backbone': scheduler}
-
-#     # LL (+ loss_pred module)
-#     elif args.method in ['LL', 'TIDAL']:
-#         optim_module = torch.optim.SGD(models['module'].parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-#         sched_module = torch.optim.lr_scheduler.MultiStepLR(optim_module, milestones=args.milestone)
-
-#         optimizers = {'backbone': optimizer, 'module': optim_module}
-#         schedulers = {'backbone': scheduler, 'module': sched_module}
-
-#     # CCAL (+ 2 contrastive coders)
-#     elif args.method == 'CCAL':
-#         optim_sem = torch.optim.SGD(models['semantic'].parameters(), lr=args.lr, weight_decay=args.weight_decay)
-#         sched_sem = torch.optim.lr_scheduler.CosineAnnealingLR(optim_sem, args.epochs_ccal, eta_min=args.min_lr)
-#         scheduler_warmup_sem = GradualWarmupScheduler(optim_sem, multiplier=10.0, total_epoch=args.warmup, after_scheduler=sched_sem)
-
-#         optim_dis = torch.optim.SGD(models['distinctive'].parameters(), lr=args.lr, weight_decay=args.weight_decay)
-#         sched_dis = torch.optim.lr_scheduler.CosineAnnealingLR(optim_dis, args.epochs_ccal, eta_min=args.min_lr)
-#         scheduler_warmup_dis = GradualWarmupScheduler(optim_dis, multiplier=10.0, total_epoch=args.warmup, after_scheduler=sched_dis)
-
-#         optimizers = {'backbone': optimizer, 'semantic': optim_sem, 'distinctive': optim_dis}
-#         schedulers = {'backbone': scheduler, 'semantic': scheduler_warmup_sem, 'distinctive': scheduler_warmup_dis}
-
-#     # MQ-Net
-#     elif args.method == 'MQNet':
-#         optim_module = torch.optim.SGD(models['module'].parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-#         sched_module = torch.optim.lr_scheduler.MultiStepLR(optim_module, milestones=args.milestone)
-
-#         optimizer_csi = torch.optim.SGD(models['csi'].parameters(), lr=args.lr, momentum=args.momentum, weight_decay=1e-6)
-#         optim_csi = LARS(optimizer_csi, eps=1e-8, trust_coef=0.001)
-
-#         sched_csi = torch.optim.lr_scheduler.CosineAnnealingLR(optim_csi, args.epochs_csi)
-#         scheduler_warmup_csi = GradualWarmupScheduler(optim_csi, multiplier=10.0, total_epoch=args.warmup, after_scheduler=sched_csi)
-
-#         optimizers = {'backbone': optimizer, 'module': optim_module, 'csi': optim_csi}
-#         schedulers = {'backbone': scheduler, 'module': sched_module, 'csi': scheduler_warmup_csi}
-    
-#     # lfosa
-#     elif args.method in ['LFOSA', 'EOAL', 'PAL']:
-#         optimizers = {'backbone': optimizer, 'ood_detection': optimizer_ood}
-#         schedulers = {'backbone': scheduler, 'ood_detection': scheduler_ood}
-#         if args.method == 'EOAL':
-#             optimizers['model_bc'] = optim_C
-
-#     return criterion, optimizers, schedulers
 
 # EOAL
 from finch import FINCH
