@@ -19,12 +19,19 @@ class EntropyCB(ALMethod):
         batch_num = len(selection_loader)
         print("| Calculating uncertainty of Unlabeled set")
         for i, data in enumerate(selection_loader):
-            inputs = data[0].to(self.args.device)
             if i % self.args.print_freq == 0:
                 print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
 
             with torch.no_grad():
-                pred, _ = self.models['backbone'](inputs)
+            # Extract input based on whether the dataset is text or image
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    input_ids = data['input_ids'].to(self.args.device)
+                    attention_mask = data['attention_mask'].to(self.args.device)
+                    pred = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask).logits
+                else:
+                    inputs = data[0].to(self.args.device)
+                    pred, _ = self.models['backbone'](inputs)
+
                 pred = torch.nn.functional.softmax(pred, dim=1).cpu().numpy()
                 # entropys = (np.log(preds + 1e-6) * preds).sum(axis=1) # U = (probs*log_probs).sum(1)
                 probs = (np.log(pred + 1e-6) * pred).sum(axis=1)
@@ -41,7 +48,10 @@ class EntropyCB(ALMethod):
         ENT_Loss=[]
         # Adaptive counts of samples per cycle
         labelled_subset = torch.utils.data.Subset(self.unlabeled_dst, self.I_index)
-        labelled_classes = [labelled_subset[i][1] for i in range(len(labelled_subset))]
+        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            labelled_classes = [labelled_subset[i]['labels'] for i in range(len(labelled_subset))]
+        else:
+            labelled_classes = [labelled_subset[i][1] for i in range(len(labelled_subset))]
         _, counts = np.unique(labelled_classes, return_counts=True)
         class_threshold=int((2*self.args.n_query+(self.cur_cycle+1)*self.args.n_query)/int(self.args.n_class))
         class_share=class_threshold-counts
@@ -53,6 +63,8 @@ class EntropyCB(ALMethod):
         elif self.args.dataset == 'TinyImageNet':
             lamda=3
             # maybe need another parameter for imagenet
+        else:
+            lamda=1
 
         for lam in [lamda]:
 
@@ -79,7 +91,10 @@ class EntropyCB(ALMethod):
             threshold = (2 * n / num_classes) + (self.cur_cycle + 1) * n / num_classes
             round=self.cur_cycle+1
             selected_subset = torch.utils.data.Subset(self.unlabeled_dst, indices)
-            selected_classes = [selected_subset[i][1] for i in range(len(selected_subset))] # self.Y[idxs_unlabeled[lb_flag]]
+            if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                selected_classes = [selected_subset[i]['labels'] for i in range(len(selected_subset))]
+            else:    
+                selected_classes = [selected_subset[i][1] for i in range(len(selected_subset))] # self.Y[idxs_unlabeled[lb_flag]]
             # labeled_classes # labeled_classes=self.Y[self.idxs_lb]
             freq = torch.histc(torch.FloatTensor(selected_classes), bins=num_classes)+torch.histc(torch.FloatTensor(labelled_classes), bins=num_classes)
             L1_distance = (sum(abs(freq - threshold)) * num_classes / (2 * (2 * n + round * n) * (num_classes - 1))).item()

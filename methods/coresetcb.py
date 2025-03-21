@@ -29,8 +29,16 @@ class CoresetCB(ALMethod):
             unlabeled_probs = []
             # Generate entire labeled_in features set
             for data in labeled_in_loader:
-                inputs = data[0].to(self.args.device)
-                out, features = self.models['backbone'](inputs)
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    input_ids = data['input_ids'].to(self.args.device)
+                    attention_mask = data['attention_mask'].to(self.args.device)
+                    outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                    hidden_states = outputs.hidden_states
+                    last_hidden_state = hidden_states[-1]
+                    features = last_hidden_state[:, 0, :]
+                else:
+                    inputs = data[0].to(self.args.device)
+                    _, features = self.models['backbone'](inputs)
     
                 if labeled_features is None:
                     labeled_features = features
@@ -39,8 +47,17 @@ class CoresetCB(ALMethod):
     
             # Generate entire unlabeled features set
             for data in unlabeled_loader:
-                inputs = data[0].to(self.args.device)
-                unlabel_out, features = self.models['backbone'](inputs)
+                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    input_ids = data['input_ids'].to(self.args.device)
+                    attention_mask = data['attention_mask'].to(self.args.device)
+                    outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                    hidden_states = outputs.hidden_states
+                    last_hidden_state = hidden_states[-1]
+                    features = last_hidden_state[:, 0, :]
+                    unlabel_out = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask).logits
+                else:
+                    inputs = data[0].to(self.args.device)
+                    unlabel_out, features = self.models['backbone'](inputs)
                 prob = torch.nn.functional.softmax(unlabel_out, dim=1).cpu().numpy()
                 unlabeled_probs.append(prob)
                 if unlabeled_features is None:
@@ -51,15 +68,19 @@ class CoresetCB(ALMethod):
         return unlabeled_probs, labeled_features, unlabeled_features
 
     def k_center_greedy(self, labeled, unlabeled, n_query, probs):
+        num_classes = self.args.n_class
         if self.args.dataset == 'CIFAR10':
-            num_classes = 10
             lamda = 5
-        else:
-            num_classes = 100
+        elif self.args.dataset == 'CIFAR100':
             lamda = 50
+        else:
+            lamda = 20
 
         labelled_subset = torch.utils.data.Subset(self.unlabeled_dst, self.I_index)
-        labelled_classes = [labelled_subset[i][1] for i in range(len(labelled_subset))]
+        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            labelled_classes = [labelled_subset[i]['labels'] for i in range(len(labelled_subset))]
+        else:
+            labelled_classes = [labelled_subset[i][1] for i in range(len(labelled_subset))]
         _, counts = np.unique(labelled_classes, return_counts=True)
         class_threshold = int((2 * self.args.n_query + (self.cur_cycle + 1) * self.args.n_query) / num_classes)
         class_share = class_threshold - counts

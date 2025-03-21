@@ -1,0 +1,25 @@
+This experiment time is:
+2025-03-22 04:21:43
+Experiment settings:
+AL method:CoresetCB
+Dataset:SST5
+Model random seed:0
+Backbone:DistilBert
+Optimizer:AdamW
+Learning rate:0.0001
+Weight decay:0.0005
+Gamma value for StepLR:0.5
+Step size for StepLR:50
+Number of total epochs each cycle:30
+Initial training set size:50
+Cycle |  Test Accuracy |  Number of in-domain query data |  Queried Classes
+1 | 28.325792537016028 | 50 | 0: 3, 1: 9, 2: 12, 3: 13, 4: 13
+2 | 34.6606350549206 | 50 | 0: 5, 1: 11, 2: 15, 3: 10, 4: 9
+3 | 40.9502270210922 | 50 | 0: 8, 1: 14, 2: 8, 3: 15, 4: 5
+4 | 41.17647082989033 | 50 | 0: 7, 1: 14, 2: 12, 3: 15, 4: 2
+5 | 41.131222340855665 | 50 | 0: 7, 1: 12, 2: 13, 3: 13, 4: 5
+6 | 41.900454180272995 | 50 | 0: 7, 1: 9, 2: 7, 3: 16, 4: 11
+7 | 42.26244338713081 | 50 | 0: 11, 1: 13, 2: 14, 3: 5, 4: 7
+8 | 42.488688404204076 | 50 | 0: 6, 1: 18, 2: 10, 3: 13, 4: 3
+9 | 39.411765724285694 | 50 | 0: 7, 1: 16, 2: 5, 3: 9, 4: 13
+10 | 38.86877935072955 | 50 | 0: 4, 1: 19, 2: 6, 3: 14, 4: 7

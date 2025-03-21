@@ -1,0 +1,25 @@
+This experiment time is:
+2025-03-22 04:11:56
+Experiment settings:
+AL method:EntropyCB
+Dataset:SST5
+Model random seed:0
+Backbone:DistilBert
+Optimizer:AdamW
+Learning rate:0.0001
+Weight decay:0.0005
+Gamma value for StepLR:0.5
+Step size for StepLR:50
+Number of total epochs each cycle:30
+Initial training set size:50
+Cycle |  Test Accuracy |  Number of in-domain query data |  Queried Classes
+1 | 28.325792537016028 | 50 | 0: 5, 1: 7, 2: 11, 3: 15, 4: 12
+2 | 34.208146056438466 | 50 | 0: 9, 1: 15, 2: 14, 3: 9, 4: 3
+3 | 38.55203718297622 | 50 | 0: 4, 1: 9, 2: 10, 3: 16, 4: 11
+4 | 38.95927648414853 | 50 | 0: 4, 1: 11, 2: 14, 3: 19, 4: 2
+5 | 40.40724069931928 | 50 | 0: 24, 1: 14, 2: 7, 3: 3, 4: 2
+6 | 44.11764818079331 | 50 | 0: 8, 1: 13, 2: 11, 3: 10, 4: 8
+7 | 40.950227366313676 | 50 | 0: 13, 1: 8, 2: 5, 3: 16, 4: 8
+8 | 41.49321304942688 | 50 | 0: 13, 1: 15, 2: 11, 3: 8, 4: 3
+9 | 42.71493252370153 | 50 | 0: 8, 1: 16, 2: 4, 3: 17, 4: 5
+10 | 42.44344022586874 | 50 | 0: 14, 1: 7, 2: 11, 3: 12, 4: 6
