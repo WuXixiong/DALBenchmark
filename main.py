@@ -47,7 +47,7 @@ if __name__ == '__main__':
         test_I_index = get_sub_test_dataset(args, test_dst)
 
         # DataLoaders
-        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TinyImageNet']: # ADD MNIST
+        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TINYIMAGENET']: # ADD MNIST
             sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
             sampler_test = SubsetSequentialSampler(test_I_index)
             train_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
@@ -166,7 +166,7 @@ if __name__ == '__main__':
                 models = meta_train(args, models, optimizers, schedulers, criterion, dataloaders['train'], unlabeled_loader, delta_loader)
 
             # Update trainloader
-            if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TinyImageNet']:
+            if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TINYIMAGENET']:
                 sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
                 dataloaders['train'] = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
                 if args.method in ['LFOSA', 'EOAL', 'PAL']:

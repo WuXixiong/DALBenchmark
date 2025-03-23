@@ -226,7 +226,7 @@ def semantic_train(args, model, criterion, optimizer, scheduler, loader, simclr_
     print('>> Train a Semantic Model.')
     time_start = time.time()
 
-    for epoch in range(args.epochs_ccal):
+    for epoch in tqdm(range(args.epochs_ccal)):
         semantic_train_epoch(args, epoch, model, criterion, optimizer, scheduler, loader, simclr_aug, linear, linear_optim)
         scheduler.step()
     print('>> Finished, Elapsed Time: {}'.format(time.time()-time_start))
@@ -235,7 +235,7 @@ def distinctive_train(args, model, criterion, optimizer, scheduler, loader, simc
     print('>> Train a Distinctive Model.')
     time_start = time.time()
 
-    for epoch in range(args.epochs_ccal):
+    for epoch in tqdm(range(args.epochs_ccal)):
         csi_train_epoch(args, epoch, model, criterion, optimizer, scheduler, loader, simclr_aug, linear, linear_optim)
         scheduler.step()
     print('>> Finished, Elapsed Time: {}'.format(time.time()-time_start))
@@ -244,7 +244,7 @@ def csi_train(args, model, criterion, optimizer, scheduler, loader, simclr_aug=N
     print('>> Train CSI.')
     time_start = time.time()
 
-    for epoch in range(args.epochs_csi):
+    for epoch in tqdm(range(args.epochs_csi)):
         csi_train_epoch(args, epoch, model, criterion, optimizer, scheduler, loader, simclr_aug, linear, linear_optim)
         scheduler.step()
     print('>> Finished, Elapsed Time: {}'.format(time.time()-time_start))
@@ -1130,7 +1130,7 @@ def get_more_args(args):
         args.im_size = (224, 224)
         #args.num_IN_class = 50
 
-    elif args.dataset == 'TinyImageNet':
+    elif args.dataset == 'TINYIMAGENET':
         args.channel = 3
         args.im_size = (64, 64)
 

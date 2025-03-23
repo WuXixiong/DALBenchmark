@@ -60,7 +60,7 @@ class EntropyCB(ALMethod):
             lamda=0.6
         elif self.args.dataset == 'CIFAR100':
             lamda=2
-        elif self.args.dataset == 'TinyImageNet':
+        elif self.args.dataset == 'TINYIMAGENET':
             lamda=3
             # maybe need another parameter for imagenet
         else:

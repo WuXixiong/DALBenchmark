@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np 
 import torch
 import torch.nn.functional as F
 import copy
@@ -14,11 +14,11 @@ class noise_stability(ALMethod):
     @torch.no_grad()
     def add_noise_to_weights(self, model):
         """
-        在原模型权重上叠加噪声，然后在函数外进行推理后再还原。
+        Add noise to the original model weights, then restore after inference outside the function.
         """
         for name, param in model.named_parameters():
-            # 只对权重（或某些指定层）加噪音
-            # 例如可以检查 if 'weight' in name 等
+            # Only add noise to weights (or specific layers)
+            # For example, you can check if 'weight' in name, etc.
             if param.requires_grad and param.dim() > 1:  
                 noise = torch.randn_like(param)
                 scale_factor = (self.args.ns_subset * param.norm() / noise.norm()).item()
@@ -27,70 +27,70 @@ class noise_stability(ALMethod):
     @torch.no_grad()
     def backup_and_add_noise(self, model, backup_params):
         """
-        先备份模型参数，再给模型加噪。
+        Backup model parameters first, then add noise to the model.
         """
         for backup_p, model_p in zip(backup_params, model.parameters()):
-            backup_p.copy_(model_p)  # 备份当前参数
+            backup_p.copy_(model_p)  # Backup current parameters
         self.add_noise_to_weights(model)
 
     @torch.no_grad()
     def restore_weights(self, model, backup_params):
         """
-        将模型参数还原到备份版本。
+        Restore model parameters to the backup version.
         """
         for backup_p, model_p in zip(backup_params, model.parameters()):
             model_p.copy_(backup_p)
 
     def run(self, **kwargs):
-        # 如果噪声非常小，可以直接随机返回结果
+        # If noise is extremely small, just return random results
         if self.args.noise_scale < 1e-8:
             uncertainty = torch.randn(self.args.n_query)
             return uncertainty
 
-        # DataLoader，用于对未标记数据集做推理
+        # DataLoader for inference on the unlabeled dataset
         selection_loader = torch.utils.data.DataLoader(
             self.unlabeled_set,
             batch_size=self.args.test_batch_size,
             num_workers=self.args.workers
         )
 
-        # 用于储存最终不确定性分数，这里只是接口需求
+        # Used to store final uncertainty scores, just for interface requirement
         uncertainty = torch.zeros(self.args.n_query).to(self.args.device)
 
-        # 先把原模型对未标记集的输出全部取出
+        # First get all outputs of the original model on the unlabeled set
         use_feature = (self.args.dataset in ['house'])
         backbone = self.models['backbone']
         backbone.eval()
         outputs = self.get_all_outputs(backbone, selection_loader, use_feature)
-        # 计算原输出各样本的范数（行范数），后续 diff_k 要除以这个值
+        # Compute row norms of original outputs, used to normalize diff_k later
         # shape: [num_unlabeled, 1]
         row_norms = torch.norm(outputs, dim=1, keepdim=True)
 
-        # 事先备份一份模型参数，这样我们不用copy.deepcopy整个模型
+        # Pre-backup model parameters to avoid deepcopy of entire model
         backup_params = [p.data.clone() for p in backbone.parameters()]
 
-        # 收集 diff_k 的列表，最后再一次 cat
+        # Collect list of diff_k, concatenate later
         diffs_list = []
 
-        # 在 n_query 次迭代中，为同一个模型加噪推理，然后还原参数
+        # In n_query iterations, add noise to the same model for inference, then restore parameters
         for _ in tqdm(range(self.args.n_query)):
-            # 给模型参数加噪
+            # Add noise to model parameters
             self.backup_and_add_noise(backbone, backup_params)
-            # noisy forward
+            # Noisy forward
             outputs_noisy = self.get_all_outputs(backbone, selection_loader, use_feature)
-            # 还原
+            # Restore
             self.restore_weights(backbone, backup_params)
 
             # diff_k = outputs_noisy - outputs
             diff_k = outputs_noisy - outputs
-            # 各行除以原输出的范数
+            # Normalize each row by the norm of original output
             diff_k = diff_k / row_norms
             diffs_list.append(diff_k)
 
-        # 一次性拼接 diff_k, 最终形状 [num_unlabeled, n_query * out_dim]
+        # Concatenate diff_k, final shape [num_unlabeled, n_query * out_dim]
         diffs = torch.cat(diffs_list, dim=1)
 
-        # 用 kcenter_greedy 方法选出 K 个索引
+        # Use kcenter_greedy method to select K indices
         indsAll = self.kcenter_greedy(diffs, self.args.n_query)
         select_idx = [tensor.item() for tensor in indsAll]
         return select_idx, uncertainty.cpu()
@@ -103,23 +103,23 @@ class noise_stability(ALMethod):
 
     def kcenter_greedy(self, X, K):
         """
-        对矩阵 X (shape = [N, dim]) 做 k-center greedy.
-        返回选中的样本索引列表，长度为 K。
+        Perform k-center greedy on matrix X (shape = [N, dim]).
+        Returns a list of selected sample indices of length K.
         """
-        # 初始化
+        # Initialization
         N = X.shape[0]
         mu = torch.zeros(1, X.shape[1], device=X.device)
         indsAll = []
         with torch.no_grad():
-            # 距离缓存
+            # Distance cache
             D2 = torch.cdist(X, mu).squeeze(1)  # (N,)
             while len(indsAll) < K:
-                # 重新计算到新中心的距离，并更新最小距离
+                # Recalculate distance to new center and update minimum distance
                 newD = torch.cdist(X, mu[-1:].detach()).squeeze(1)  # shape: [N]
                 D2 = torch.min(D2, newD)
-                # 找到当前距离最大的点
+                # Find the point with the largest current distance
                 ind = torch.argmax(D2)  
-                # 将该点加入中心集合
+                # Add this point to the center set
                 mu = torch.cat((mu, X[ind].unsqueeze(0)), dim=0)
                 D2[ind] = 0
                 indsAll.append(ind)
@@ -129,32 +129,31 @@ class noise_stability(ALMethod):
     @torch.no_grad()
     def get_all_outputs(self, model, unlabeled_loader, use_feature=False):
         """
-        将传入 model 对所有 unlabeled_loader 里的数据做一次前向推理。
-        根据 use_feature 选择输出特征向量或分类概率。
+        Run forward inference once for all data in unlabeled_loader using the input model.
+        Output either feature vectors or classification probabilities depending on use_feature.
         """
         model.eval()
         outputs = []
         for data in unlabeled_loader:
             if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
-                # 提取 input_ids 和 attention_mask，并将其移动到指定设备
+                # Extract input_ids and attention_mask, move to specified device
                 input_ids = data['input_ids'].to(self.args.device)
                 attention_mask = data['attention_mask'].to(self.args.device)
-                # 获取模型输出
+                # Get model output
                 model_output = model(input_ids=input_ids, attention_mask=attention_mask)
                 logits = model_output.logits
                 if use_feature:
-                    # 如果需要特征，提取最后一层隐藏状态的第一个标记（通常是 [CLS] 标记）的输出
+                    # If features are needed, extract the output of the first token (usually [CLS]) from the last hidden state
                     features = model_output.hidden_states[-1][:, 0, :]
                     batch_out = features
                 else:
-                    # 否则，计算分类概率
+                    # Otherwise, compute classification probabilities
                     batch_out = F.softmax(logits, dim=1)
             else:
-                # 对于其他数据集，处理方式可能不同，请根据实际情况调整
+                # For other datasets, processing might differ, adjust as needed
                 inputs = data[0].to(self.args.device)
                 logits, features = model(inputs)
                 batch_out = features if use_feature else F.softmax(logits, dim=1)
             
             outputs.append(batch_out)
         return torch.cat(outputs, dim=0)
-

@@ -61,7 +61,7 @@ def get_dataset(args, trial):
         T_normalize = T.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
     elif args.dataset == 'CIFAR100':
         T_normalize = T.Normalize([0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761])
-    elif args.dataset == 'TinyImageNet':
+    elif args.dataset == 'TINYIMAGENET':
         T_normalize = T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     elif args.dataset == 'MNIST':
         T_normalize = T.Normalize([0.1307], [0.3081])  # Mean and std for MNIST
@@ -72,9 +72,7 @@ def get_dataset(args, trial):
     if args.dataset in ['CIFAR10', 'CIFAR100', 'SVHN']:
         train_transform = T.Compose([T.RandomHorizontalFlip(), T.RandomCrop(size=32, padding=4), T.ToTensor(), T_normalize])  #
         test_transform = T.Compose([T.ToTensor(), T_normalize])
-    elif args.dataset == 'TinyImageNet':
-        # train_transform = T.Compose([T.Resize(64), T.RandomCrop(64, padding=4), T.RandomHorizontalFlip(), T.ToTensor(), T_normalize])
-        # test_transform = T.Compose([T.Resize(64), T.ToTensor(), T_normalize])
+    elif args.dataset == 'TINYIMAGENET':
         train_transform = T.Compose([
             T.Resize(64),
             T.RandomCrop(64, padding=4),
@@ -125,7 +123,7 @@ def get_dataset(args, trial):
         train_set = MySVHN(svhn_dataset['train'], transform=train_transform)
         unlabeled_set = MySVHN(svhn_dataset['train'], transform=test_transform)
         test_set = MySVHN(svhn_dataset['test'], transform=test_transform)
-    elif args.dataset == 'TinyImageNet':
+    elif args.dataset == 'TINYIMAGENET':
         # TinyImageNet is not directly available in Hugging Face datasets
         tiny_imagenet_dataset = load_dataset('zh-plus/tiny-imagenet')
         train_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=train_transform, imbalance_factor = args.imb_factor)
@@ -270,7 +268,7 @@ def get_dataset(args, trial):
         # Calculate untarget_list (classes that will be treated as OOD)
         args.untarget_list = list(np.setdiff1d(list(range(0, 100)), list(args.target_list)))
     
-    elif args.dataset == 'TinyImageNet':    
+    elif args.dataset == 'TINYIMAGENET':    
         if args.openset:
             args.input_size = 64 * 64 * 3
             args.target_list = random.sample(list(range(200)), int(200 * (1 - args.ood_rate))) # SEED 1 200*(1-args.ood_rate)
@@ -284,7 +282,7 @@ def get_dataset(args, trial):
             args.num_IN_class = 200  # For tinyimagenet
 
     # Class conversion for different dataset types
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TinyImageNet']: 
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TINYIMAGENET']: 
         # For standard image datasets
         for i, c in enumerate(args.untarget_list):
             # Mark untarget classes with temporary value (args.n_class)
@@ -338,7 +336,7 @@ def get_dataset(args, trial):
     # Split Check and Reporting
     print("Target classes: ", args.target_list)
     
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TinyImageNet', 'AGNEWS', 'IMDB', 'SST5']:
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TINYIMAGENET', 'AGNEWS', 'IMDB', 'SST5']:
         if args.method == 'EPIG':
             uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
             print("Train, # samples per class")
@@ -382,7 +380,7 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
     ood_rate = args.ood_rate
 
     if initial:
-        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TinyImageNet']:
+        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TINYIMAGENET']:
             if args.openset:
                 # Handle text datasets differently
                 if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
@@ -510,7 +508,7 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index, ini
 
 def get_sub_test_dataset(args, dataset):
     classes = args.target_list
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TinyImageNet']: # add 'MNIST'
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TINYIMAGENET']: # add 'MNIST'
         labeled_index = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
     if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
         labeled_index = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]    
