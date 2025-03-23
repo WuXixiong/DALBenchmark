@@ -1,8 +1,9 @@
 from torch.utils.data import Dataset
 import torch
+import numpy as np
 
 class MySST5Dataset(Dataset):
-    def __init__(self, hf_dataset, tokenizer, max_length=128):
+    def __init__(self, hf_dataset, tokenizer, max_length=128, imbalance_factor=1.0):
         """
         Initialize the SST-5 dataset.
 
@@ -10,12 +11,44 @@ class MySST5Dataset(Dataset):
         hf_dataset (Dataset): Hugging Face dataset object.
         tokenizer (BertTokenizer): Tokenizer used for text encoding.
         max_length (int): Maximum length of text sequences (default: 128).
+        imbalance_factor (float): Imbalance factor to control the degree of long-tail distribution (default: 1.0).
         """
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.data = hf_dataset['text']
         self.targets = torch.tensor(hf_dataset['label'], dtype=torch.long)
         self.classes = ['very negative', 'negative', 'neutral', 'positive', 'very positive']
+
+        if imbalance_factor:
+            # Extract texts and labels
+            texts = hf_dataset['text']
+            labels = hf_dataset['label']
+
+            # Create a dictionary to store samples for each class
+            class_samples = {cls: [] for cls in range(len(self.classes))}
+
+            # Assign samples to the corresponding class
+            for text, label in zip(texts, labels):
+                class_samples[label].append(text)
+
+            # Compute the number of samples per class to follow a long-tail distribution
+            num_classes = len(self.classes)
+            # Currently use the minimum number of samples across all classes
+            min_samples = min(len(samples) for samples in class_samples.values())
+            class_sizes = [int(min_samples * (imbalance_factor ** (i / (num_classes - 1))))
+                        for i in range(num_classes)]
+
+            # Build the imbalanced dataset
+            self.data = []
+            self.targets = []
+            for cls in range(num_classes):
+                samples = class_samples[cls]
+                num_samples = min(len(samples), class_sizes[cls])
+                selected_samples = np.random.choice(samples, num_samples, replace=False)
+                self.data.extend(selected_samples)
+                self.targets.extend([cls] * num_samples)
+
+            self.targets = torch.tensor(self.targets, dtype=torch.long)
 
     def __getitem__(self, index):
         """

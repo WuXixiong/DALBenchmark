@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import math
 import random
 from torch.utils.data.dataset import Subset
 from ownDatasets.tinyimagenet import MyTinyImageNet
@@ -108,14 +107,14 @@ def get_dataset(args, trial):
     # Dataset loading
     if args.dataset == 'CIFAR10':
         cifar10_dataset = load_dataset('cifar10')
-        train_set = MyCIFAR10(cifar10_dataset['train'], transform=train_transform)
-        unlabeled_set = MyCIFAR10(cifar10_dataset['train'], transform=test_transform)
-        test_set = MyCIFAR10(cifar10_dataset['test'], transform=test_transform)
+        train_set = MyCIFAR10(cifar10_dataset['train'], transform=train_transform, imbalance_factor = args.imb_factor)
+        unlabeled_set = MyCIFAR10(cifar10_dataset['train'], transform=test_transform, imbalance_factor = args.imb_factor)
+        test_set = MyCIFAR10(cifar10_dataset['test'], transform=test_transform, imbalance_factor = args.imb_factor)
     elif args.dataset == 'CIFAR100':
         cifar100_dataset = load_dataset('cifar100')
-        train_set = MyCIFAR100(cifar100_dataset['train'], transform=train_transform)
-        unlabeled_set = MyCIFAR100(cifar100_dataset['train'], transform=test_transform)
-        test_set = MyCIFAR100(cifar100_dataset['test'], transform=test_transform)
+        train_set = MyCIFAR100(cifar100_dataset['train'], transform=train_transform, imbalance_factor = args.imb_factor)
+        unlabeled_set = MyCIFAR100(cifar100_dataset['train'], transform=test_transform, imbalance_factor = args.imb_factor)
+        test_set = MyCIFAR100(cifar100_dataset['test'], transform=test_transform, imbalance_factor = args.imb_factor)
     elif args.dataset == 'MNIST':
         mnist_dataset = load_dataset('mnist')
         train_set = MyMNIST(mnist_dataset['train'], transform=train_transform)
@@ -129,9 +128,9 @@ def get_dataset(args, trial):
     elif args.dataset == 'TinyImageNet':
         # TinyImageNet is not directly available in Hugging Face datasets
         tiny_imagenet_dataset = load_dataset('zh-plus/tiny-imagenet')
-        train_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=train_transform)
-        unlabeled_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=test_transform)
-        test_set = MyTinyImageNet(tiny_imagenet_dataset['valid'], transform=test_transform)
+        train_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=train_transform, imbalance_factor = args.imb_factor)
+        unlabeled_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=test_transform, imbalance_factor = args.imb_factor)
+        test_set = MyTinyImageNet(tiny_imagenet_dataset['valid'], transform=test_transform, imbalance_factor = args.imb_factor)
     elif args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
         # Load the text datasets
         if args.model == 'DistilBert':
@@ -142,19 +141,19 @@ def get_dataset(args, trial):
         # Initialize datasets for training, validation, and testing
         if args.dataset == 'SST5':
             dataset = load_dataset('SetFit/sst5')
-            train_set = MySST5Dataset(dataset['train'], tokenizer)
-            test_set = MySST5Dataset(dataset['test'], tokenizer)
-            unlabeled_set = MySST5Dataset(dataset['train'], tokenizer)
+            train_set = MySST5Dataset(dataset['train'], tokenizer, imbalance_factor = args.imb_factor)
+            test_set = MySST5Dataset(dataset['test'], tokenizer, imbalance_factor = args.imb_factor)
+            unlabeled_set = MySST5Dataset(dataset['train'], tokenizer, imbalance_factor = args.imb_factor)
         elif args.dataset == 'IMDB':
             imdb_dataset = load_dataset('imdb')
-            train_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, max_length=128)
-            test_set = MyIMDBDataset(imdb_dataset['test'], tokenizer=tokenizer, max_length=128)
-            unlabeled_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, max_length=128)
+            train_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, max_length=128, imbalance_factor = args.imb_factor)
+            test_set = MyIMDBDataset(imdb_dataset['test'], tokenizer=tokenizer, max_length=128, imbalance_factor = args.imb_factor)
+            unlabeled_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, max_length=128, imbalance_factor = args.imb_factor)
         else:  # AGNEWS
             agnews_dataset = load_dataset('ag_news')
-            train_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, max_length=128)
-            test_set = MyAGNewsDataset(agnews_dataset['test'], tokenizer=tokenizer, max_length=128)
-            unlabeled_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, max_length=128)
+            train_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, max_length=128, imbalance_factor = args.imb_factor)
+            test_set = MyAGNewsDataset(agnews_dataset['test'], tokenizer=tokenizer, max_length=128, imbalance_factor = args.imb_factor)
+            unlabeled_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, max_length=128, imbalance_factor = args.imb_factor)
 
     # Class split configuration
     if args.dataset in ['CIFAR10', 'SVHN']:
@@ -301,175 +300,8 @@ def get_dataset(args, trial):
         # Relabel OOD classes to num_IN_class
         train_set.targets[np.where(train_set.targets == int(args.n_class))[0]] = int(args.num_IN_class)
         test_set.targets[np.where(test_set.targets == int(args.n_class))[0]] = int(args.num_IN_class)
-
-    elif args.dataset in ['SST5']:
-        # SST5特殊处理
-        print("开始转换SST5数据集类别...")
-        print(f"原始目标类别: {args.target_list}")
-        print(f"原始非目标类别: {args.untarget_list}")
-        
-        # 确保targets属性存在
-        if not hasattr(train_set, 'targets'):
-            print("错误: 训练集没有'targets'属性。请检查数据集类的实现。")
-            raise AttributeError("训练集中没有找到'targets'属性")
-        if not hasattr(test_set, 'targets'):
-            print("错误: 测试集没有'targets'属性。请检查数据集类的实现。")
-            raise AttributeError("测试集中没有找到'targets'属性")
-        
-        # 转换为numpy数组
-        train_targets = np.array(train_set.targets)
-        test_targets = np.array(test_set.targets)
-        
-        # 打印转换前的原始类别分布
-        train_unique, train_counts = np.unique(train_targets, return_counts=True)
-        test_unique, test_counts = np.unique(test_targets, return_counts=True)
-        print("转换前的原始类别分布:")
-        print("训练集:", list(zip(train_unique, train_counts)))
-        print("测试集:", list(zip(test_unique, test_counts)))
-        
-        # 创建新的目标数组，初始化为-1
-        new_train_targets = np.full_like(train_targets, -1)
-        new_test_targets = np.full_like(test_targets, -1)
-        
-        # 检查SST5数据集类别是否从0或1开始
-        # 通常SST5的类别应该是0,1,2,3,4，但有时可能是1,2,3,4,5
-        min_class = min(np.min(train_targets), np.min(test_targets))
-        class_offset = min_class  # 如果最小类别是1，需要减1来调整
-        
-        if min_class > 0:
-            print(f"注意: SST5类别从{min_class}开始而不是0，应用偏移量调整。")
-        
-        if args.openset:
-            # 在开放集设置下:
-            # 1. 为每个目标(in-distribution)类别分配新的标签
-            for i, c in enumerate(args.target_list):
-                # 调整类别以匹配数据集实际编码
-                adjusted_class = c + class_offset
-                print(f"将原始类别 {adjusted_class} 映射到新类别 {i}")
-                new_train_targets[train_targets == adjusted_class] = i
-                new_test_targets[test_targets == adjusted_class] = i
-            
-            # 2. 将所有非目标类别标记为OOD(args.num_IN_class)
-            for c in args.untarget_list:
-                # 调整类别以匹配数据集实际编码
-                adjusted_class = c + class_offset
-                print(f"将原始类别 {adjusted_class} 标记为OOD类别 {args.num_IN_class}")
-                new_train_targets[train_targets == adjusted_class] = args.num_IN_class
-                new_test_targets[test_targets == adjusted_class] = args.num_IN_class
-        else:
-            # 在闭集设置下:
-            # 直接转换所有类别(不需要OOD)
-            for i, c in enumerate(range(args.n_class)):
-                # 调整类别以匹配数据集实际编码
-                adjusted_class = c + class_offset
-                new_train_targets[train_targets == adjusted_class] = i
-                new_test_targets[test_targets == adjusted_class] = i
-        
-        # 确保所有样本都被分配了新标签
-        if np.any(new_train_targets == -1) or np.any(new_test_targets == -1):
-            unassigned_train = np.sum(new_train_targets == -1)
-            unassigned_test = np.sum(new_test_targets == -1)
-            print(f"错误: 有{unassigned_train}个训练样本和{unassigned_test}个测试样本未被分配类别!")
-            # 打印未分配样本的原始类别
-            if unassigned_train > 0:
-                unassigned_classes = np.unique(train_targets[new_train_targets == -1])
-                print(f"未分配的训练样本原始类别: {unassigned_classes}")
-            if unassigned_test > 0:
-                unassigned_classes = np.unique(test_targets[new_test_targets == -1])
-                print(f"未分配的测试样本原始类别: {unassigned_classes}")
-            
-            # 将未分配的样本作为OOD处理
-            if args.openset:
-                print("将未分配的样本作为OOD处理")
-                new_train_targets[new_train_targets == -1] = args.num_IN_class
-                new_test_targets[new_test_targets == -1] = args.num_IN_class
-            else:
-                # 在闭集情况下，这不应该发生
-                raise ValueError("在闭集设置中发现未分配的样本，请检查类别转换逻辑!")
-        
-        # 更新数据集的targets
-        train_set.targets = new_train_targets
-        test_set.targets = new_test_targets
-        
-        # 打印转换后的类别分布
-        train_unique, train_counts = np.unique(train_set.targets, return_counts=True)
-        test_unique, test_counts = np.unique(test_set.targets, return_counts=True)
-        print("转换后的类别分布:")
-        print("训练集:", list(zip(train_unique, train_counts)))
-        print("测试集:", list(zip(test_unique, test_counts)))
-        
-        # 验证类别转换
-        if args.openset:
-            in_classes = np.unique(train_set.targets[train_set.targets < args.num_IN_class])
-            expected_classes = np.arange(args.num_IN_class)
-            
-            if not np.array_equal(np.sort(in_classes), expected_classes):
-                print(f"警告: 转换后的in-distribution类别{in_classes}与预期{expected_classes}不符!")
-            
-            in_count = np.sum(train_set.targets < args.num_IN_class)
-            ood_count = np.sum(train_set.targets == args.num_IN_class)
-            print(f"训练集 IN 样本数: {in_count}, OOD 样本数: {ood_count}")
-
-    elif args.dataset in ['AGNEWS']:
-        # 文本数据集特殊处理
-        print("开始转换文本数据集类别...")
-        print(f"原始目标类别: {args.target_list}")
-        print(f"原始非目标类别: {args.untarget_list}")
-        
-        # 确保targets属性存在并转为numpy数组
-        if not hasattr(train_set, 'targets'):
-            print("错误: 训练集没有'targets'属性。请检查数据集类的实现。")
-            raise AttributeError("训练集中没有找到'targets'属性")
-        if not hasattr(test_set, 'targets'):
-            print("错误: 测试集没有'targets'属性。请检查数据集类的实现。")
-            raise AttributeError("测试集中没有找到'targets'属性")
-        
-        # 转换为numpy数组以便进行操作
-        if not isinstance(train_set.targets, np.ndarray):
-            train_set.targets = np.array(train_set.targets)
-        if not isinstance(test_set.targets, np.ndarray):
-            test_set.targets = np.array(test_set.targets)
-        
-        # 打印转换前的统计信息
-        train_unique, train_counts = np.unique(train_set.targets, return_counts=True)
-        test_unique, test_counts = np.unique(test_set.targets, return_counts=True)
-        print("转换前的类别分布:")
-        print("训练集:", list(zip(train_unique, train_counts)))
-        print("测试集:", list(zip(test_unique, test_counts)))
-        
-        # 1. 首先，明确要标记为OOD的类别
-        # 非目标类别(untarget_list)在开放集情况下应该被标记为OOD
-        if args.openset:
-            # 临时使用一个特殊值标记OOD类别
-            temp_ood_marker = int(args.n_class) + 999  # 使用一个不可能是原始类别的值
-            
-            # 标记非目标类别为OOD(使用临时标记)
-            for c in args.untarget_list:
-                train_mask = (train_set.targets == c)
-                test_mask = (test_set.targets == c)
-                train_set.targets[train_mask] = temp_ood_marker
-                test_set.targets[test_mask] = temp_ood_marker
-            
-            # 2. 重新映射目标类别(从0开始)
-            args.target_list.sort()  # 确保目标列表有序
-            for i, c in enumerate(args.target_list):
-                train_mask = (train_set.targets == c)
-                test_mask = (test_set.targets == c)
-                train_set.targets[train_mask] = i
-                test_set.targets[test_mask] = i
-            
-            # 3. 将临时OOD标记替换为最终OOD类别索引(num_IN_class)
-            train_set.targets[train_set.targets == temp_ood_marker] = int(args.num_IN_class)
-            test_set.targets[test_set.targets == temp_ood_marker] = int(args.num_IN_class)
-        
-        # 打印转换后的统计信息
-        train_unique, train_counts = np.unique(train_set.targets, return_counts=True)
-        test_unique, test_counts = np.unique(test_set.targets, return_counts=True)
-        print("转换后的类别分布:")
-        print("训练集:", list(zip(train_unique, train_counts)))
-        print("测试集:", list(zip(test_unique, test_counts)))
     
-    elif args.dataset in ['IMDB']:
+    elif args.dataset in ['SST5', 'AGNEWS','IMDB']:
         # For text datasets, ensure proper handling of targets
         if hasattr(train_set, 'targets') and hasattr(test_set, 'targets'):
             # Convert targets to numpy arrays for easier manipulation if they're not already
@@ -506,7 +338,7 @@ def get_dataset(args, trial):
     # Split Check and Reporting
     print("Target classes: ", args.target_list)
     
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TinyImageNet']:
+    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TinyImageNet', 'AGNEWS', 'IMDB', 'SST5']:
         if args.method == 'EPIG':
             uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
             print("Train, # samples per class")
@@ -519,44 +351,6 @@ def get_dataset(args, trial):
         uni, cnt = np.unique(np.array(test_set.targets), return_counts=True)
         print("Test, # samples per class")
         print(uni, cnt)
-
-    elif args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
-        # 文本数据集报告
-        uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
-        print("训练集, 每个类别的样本数")
-        print(list(zip(uni, cnt)))
-        
-        # 分别报告in-distribution和OOD类别
-        if args.openset:
-            in_mask = np.array([t < args.num_IN_class for t in unlabeled_set.targets])
-            ood_mask = np.array([t == args.num_IN_class for t in unlabeled_set.targets])
-            
-            in_count = np.sum(in_mask)
-            ood_count = np.sum(ood_mask)
-            
-            in_classes = np.unique(unlabeled_set.targets[in_mask])
-            print(f"训练集 IN 样本: {in_count}, 类别: {in_classes}")
-            print(f"训练集 OOD 样本: {ood_count}")
-            
-            # 验证是否所有目标类别都有样本
-            if len(in_classes) != len(args.target_list):
-                print(f"警告: 目标类别数({len(args.target_list)})与实际in-distribution类别数({len(in_classes)})不匹配!")
-        
-        uni, cnt = np.unique(np.array(test_set.targets), return_counts=True)
-        print("测试集, 每个类别的样本数")
-        print(list(zip(uni, cnt)))
-        
-        # 分别报告测试集的in-distribution和OOD类别
-        if args.openset:
-            in_mask = np.array([t < args.num_IN_class for t in test_set.targets])
-            ood_mask = np.array([t == args.num_IN_class for t in test_set.targets])
-            
-            in_count = np.sum(in_mask)
-            ood_count = np.sum(ood_mask)
-            
-            in_classes = np.unique(test_set.targets[in_mask])
-            print(f"测试集 IN 样本: {in_count}, 类别: {in_classes}")
-            print(f"测试集 OOD 样本: {ood_count}")
     
     return train_set, unlabeled_set, test_set
 

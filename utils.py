@@ -943,10 +943,36 @@ def test(args, models, dataloaders):
 
     return top1.avg
 
+# def test_nlp(args, models, dataloaders):
+#     top1 = AverageMeter('Acc@1', ':6.2f')
+#     # Switch to evaluation mode
+#     models['backbone'].eval()
+    
+#     with torch.no_grad():  # Only need one torch.no_grad() block
+#         for i, data in enumerate(dataloaders['test']):
+#             # Extract and move data to the correct device
+#             input_ids = data['input_ids'].to(args.device)
+#             attention_mask = data['attention_mask'].to(args.device)
+#             labels = data['labels'].to(args.device)
+#             scores = models['backbone'](
+#                 input_ids=input_ids, 
+#                 attention_mask=attention_mask
+#             ).logits  # Get logits from BertForSequenceClassification
+            
+#             # Measure accuracy and record loss
+#             prec1 = accuracy(scores.data, labels, topk=(1,))[0]
+#             top1.update(prec1.item(), input_ids.size(0))
+    
+#     print(f'Test acc: * Prec@1 {top1.avg:.3f}')
+#     return top1.avg
+
 def test_nlp(args, models, dataloaders):
     top1 = AverageMeter('Acc@1', ':6.2f')
     # Switch to evaluation mode
     models['backbone'].eval()
+    
+    # Create a list to collect all labels
+    all_labels = []
     
     with torch.no_grad():  # Only need one torch.no_grad() block
         for i, data in enumerate(dataloaders['test']):
@@ -955,26 +981,25 @@ def test_nlp(args, models, dataloaders):
             attention_mask = data['attention_mask'].to(args.device)
             labels = data['labels'].to(args.device)
             
-            # Compute output
-            if args.method == 'TIDAL':
-                scores, _, _ = models['backbone'](
-                    input_ids=input_ids, 
-                    attention_mask=attention_mask, 
-                    method='TIDAL'
-                )
-            else:
-                scores = models['backbone'](
-                    input_ids=input_ids, 
-                    attention_mask=attention_mask
-                ).logits  # Get logits from BertForSequenceClassification
+            # Collect all labels
+            all_labels.extend(labels.cpu().numpy().tolist())
+            
+            scores = models['backbone'](
+                input_ids=input_ids, 
+                attention_mask=attention_mask
+            ).logits  # Get logits from BertForSequenceClassification
             
             # Measure accuracy and record loss
             prec1 = accuracy(scores.data, labels, topk=(1,))[0]
             top1.update(prec1.item(), input_ids.size(0))
     
+    # Get unique labels
+    unique_labels = sorted(set(all_labels))
+    
     print(f'Test acc: * Prec@1 {top1.avg:.3f}')
+    print(f'Unique labels in test set: {unique_labels}')
+    
     return top1.avg
-
 
 def test_ood(args, models, dataloaders):
     top1 = AverageMeter('Acc@1', ':6.2f')
