@@ -161,7 +161,7 @@ class AlphaMixSampling(ALMethod):
 			selected_idxs = self.U_index_sub[selected_idxs]
 
 		else:
-			selected_idxs = np.array([], dtype=np.int)
+			selected_idxs = np.array([], dtype=np.int64)
 
 		if len(selected_idxs) < n:
 			remained = n - len(selected_idxs)

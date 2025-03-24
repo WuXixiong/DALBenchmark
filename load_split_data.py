@@ -270,8 +270,9 @@ def get_dataset(args, trial):
     
     elif args.dataset == 'TINYIMAGENET':    
         if args.openset:
+            random.seed(args.seed + trial) # set random seed
             args.input_size = 64 * 64 * 3
-            args.target_list = random.sample(list(range(200)), int(200 * (1 - args.ood_rate))) # SEED 1 200*(1-args.ood_rate)
+            args.target_list = random.sample(list(range(200)), int(200 * (1 - args.ood_rate))) # 200*(1-args.ood_rate)
             args.untarget_list = list(np.setdiff1d(list(range(0, 200)), list(args.target_list)))
             args.num_IN_class = len(args.target_list)  # For tinyimagenet
         else:
