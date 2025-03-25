@@ -9,18 +9,14 @@ from torchlars import LARS
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data.dataset import Subset
-
 from methods.methods_utils.mqnet_util import *
 from methods.methods_utils.ccal_util import *
 from methods.methods_utils.simclr import semantic_train_epoch
 from methods.methods_utils.simclr_CSI import csi_train_epoch
-
 from copy import deepcopy
 from torch.utils.tensorboard import SummaryWriter
-
 from transformers import RobertaForSequenceClassification
 from transformers import DistilBertForSequenceClassification
-
 
 # LFOSA
 class CenterLoss(nn.Module):
@@ -1160,11 +1156,9 @@ def get_models(args, nets, model, models):
         def load_text_model(num_labels):
             # Load the corresponding text model with the specified number of labels.
             if args.model == 'DistilBert':
-                from transformers import DistilBertForSequenceClassification
                 return DistilBertForSequenceClassification.from_pretrained(
                     'distilbert-base-uncased', num_labels=int(num_labels), output_hidden_states=True)
             else:  # args.model == 'Roberta'
-                from transformers import RobertaForSequenceClassification
                 return RobertaForSequenceClassification.from_pretrained(
                     'roberta-base', num_labels=int(num_labels), output_hidden_states=True)
 
