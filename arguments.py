@@ -1,7 +1,5 @@
 import argparse
-import numpy as np
-import time
-from utils import *
+from utils import str_to_bool
 
 parser = argparse.ArgumentParser(description='Parameter Processing')
 

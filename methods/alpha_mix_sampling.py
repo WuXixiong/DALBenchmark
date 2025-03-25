@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 
 class AlphaMixSampling(ALMethod):
-	def __init__(self, args, models, train_dst, unlabeled_dst, U_index, I_index, **kwargs):
+	def __init__(self, args, models, unlabeled_dst, U_index, I_index, **kwargs):
 		super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
 		self.I_index = I_index
 		self.labeled_set = torch.utils.data.Subset(unlabeled_dst, I_index)

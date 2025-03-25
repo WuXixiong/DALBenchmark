@@ -16,31 +16,6 @@ from transformers import RobertaTokenizer
 from datasets import load_dataset
 from torchvision.transforms import Lambda
 
-CIFAR10_SUPERCLASS = list(range(10))  # one class
-CIFAR100_SUPERCLASS = [
-    [4, 31, 55, 72, 95],#1  d
-    [1, 33, 67, 73, 91],#2  d
-    [54, 62, 70, 82, 92],#3
-    [9, 10, 16, 29, 61],#4
-    [0, 51, 53, 57, 83],#5
-    [22, 25, 40, 86, 87],#6
-    [5, 20, 26, 84, 94],#7
-    [6, 7, 14, 18, 24],#8   d
-    [3, 42, 43, 88, 97],#9   d
-    [12, 17, 38, 68, 76],#10
-    [23, 34, 49, 60, 71],#11
-    [15, 19, 21, 32, 39],#12  d
-    [35, 63, 64, 66, 75],#13  d
-    [27, 45, 77, 79, 99],#14
-    [2, 11, 36, 46, 98],#15
-    [28, 30, 44, 78, 93],#16   d
-    [37, 50, 65, 74, 80],#17   d
-    [47, 52, 56, 59, 96],#18
-    [8, 13, 48, 58, 90],#19
-    [41, 69, 81, 85, 89],#20
-]
-IMAGENET_SUPERCLASS = list(range(30))  # one class
-
 def get_subset_with_len(dataset, length, shuffle=False):
     dataset_size = len(dataset)
 
@@ -352,16 +327,6 @@ def get_dataset(args, trial):
         print(uni, cnt)
     
     return train_set, unlabeled_set, test_set
-
-def get_superclass_list(dataset):
-    if dataset == 'CIFAR10':
-        return CIFAR10_SUPERCLASS
-    elif dataset == 'CIFAR100':
-        return CIFAR100_SUPERCLASS
-    elif dataset == 'ImageNet50':
-        return IMAGENET_SUPERCLASS
-    else:
-        raise NotImplementedError()
 
 def get_subclass_dataset(dataset, classes):
     if not isinstance(classes, list):

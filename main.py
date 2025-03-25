@@ -11,6 +11,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 # Utils
 from utils import *
+from trainers import *
 
 # Custom
 from arguments import parser
@@ -87,7 +88,7 @@ if __name__ == '__main__':
             criterion, optimizers, schedulers = get_optim_configurations(args, models)
 
             # for LFOSA and EOAL...
-            criterion_xent = nn.CrossEntropyLoss()
+            criterion_xent = torch.nn.CrossEntropyLoss()
             if args.dataset in ['AGNEWS', 'IMDB', 'SST5']: # text dataset
                 criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=768, use_gpu=True) # feat_dim = first dim of
                 optimizer_centloss = torch.optim.AdamW(criterion_cent.parameters(), lr=0.005)
@@ -109,24 +110,16 @@ if __name__ == '__main__':
 
             # Training
             t = time.time()
-            train(args, models, criterion, optimizers, schedulers, dataloaders, criterion_xent, criterion_cent, optimizer_centloss, O_index, cluster_centers, cluster_labels, cluster_indices, wnet, optimizer_wnet)
+            train_model(args, models, criterion, optimizers, schedulers, dataloaders, 
+                      criterion_xent, criterion_cent, optimizer_centloss, 
+                      O_index, cluster_centers, cluster_labels, cluster_indices)
             print("cycle: {}, elapsed time: {}".format(cycle, (time.time() - t)))
 
-            # Test for texts
-            if args.dataset in ['AGNEWS', 'IMDB' , 'SST5']:
-                acc = test_nlp(args, models, dataloaders)
-            # Test for images
-            else:
-                acc = test(args, models, dataloaders)
+            # Test
+            acc = evaluate_model(args, models, dataloaders)
 
             print('Trial {}/{} || Cycle {}/{} || Labeled IN size {}: Test acc {}'.format(
                     trial + 1, args.trial, cycle + 1, args.cycle, len(I_index), acc), flush=True)
-            if args.method in ['LFOSA', 'EOAL', 'PAL']:
-                if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
-                    ood_acc = test_ood_nlp(args, models, dataloaders)
-                else:
-                    ood_acc = test_ood(args, models, dataloaders)
-                print('Out of domain detection acc is {}'.format(ood_acc), flush=True)
 
             #### AL Query ####
             print("==========Start Querying==========")
@@ -139,10 +132,7 @@ if __name__ == '__main__':
                                   cluster_labels=cluster_labels,
                                   cluster_indices=cluster_indices,
                                   wnet=wnet)
-            if args.method in ["VAAL", "AlphaMixSampling"]:
-                ALmethod = methods.__dict__[args.method](args, models, train_dst, unlabeled_dst, U_index, **selection_args)
-            else:
-                ALmethod = methods.__dict__[args.method](args, models, unlabeled_dst, U_index, **selection_args)
+            ALmethod = methods.__dict__[args.method](args, models, unlabeled_dst, U_index, **selection_args)
             Q_index, Q_scores = ALmethod.select()
 
             # get query data class
