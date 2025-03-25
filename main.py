@@ -1,5 +1,4 @@
 # Python
-import os
 import time
 import random
 
@@ -15,10 +14,10 @@ from trainers import *
 
 # Custom
 from arguments import parser
-from load_split_data import get_dataset, get_sub_train_dataset, get_sub_test_dataset
+from loadData import get_dataset, get_sub_train_dataset, get_sub_test_dataset
 import nets
 import methods as methods
-from collections import defaultdict, Counter
+from collections import Counter
 from logger import initialize_log, log_cycle_info, save_logs
 
 # Main

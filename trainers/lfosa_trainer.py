@@ -1,5 +1,5 @@
 """
-Training functionality for LFOSA (Learning From Out-of-distribution Samples Adaptively) method.
+Training functionality for LFOSA method.
 """
 import torch
 import torch.nn as nn
