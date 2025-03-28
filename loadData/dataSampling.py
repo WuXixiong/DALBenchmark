@@ -45,100 +45,99 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index=None
     ood_rate = args.ood_rate
 
     if initial:
-        if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'AGNEWS', 'IMDB', 'SST5', 'TINYIMAGENET']:
-            if args.openset:
-                # Handle text datasets differently
-                if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
-                    L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
-                    O_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] >= len(classes)]
-                else:
-                    # Handle image datasets
-                    L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
-                    O_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] >= len(classes)]
-
-                # Calculate number of OOD samples based on ood_rate
-                n_ood = round(ood_rate * (len(L_total) + len(O_total)))
-
-                # Check if we have enough OOD samples
-                if n_ood > len(O_total):
-                    print('The currently designed number of OOD samples is ' + str(n_ood) + ', but the actual number of OOD samples in the dataset is only ' + str(len(O_total)) + '.')
-                    print('Using all OOD data and adjusting the ID data to maintain the OOD rate.')
-                    n_ood = len(O_total)
-                    n_id = round(len(O_total)/ood_rate - len(O_total))
-                    # Make sure we don't sample more than available
-                    n_id = min(n_id, len(L_total))
-                    L_total = random.sample(L_total, n_id)
-                else:
-                    # Sample OOD based on calculated number
-                    O_total = random.sample(O_total, n_ood)
-                
-                print("# Total in: {}, ood: {}".format(len(L_total), len(O_total)))
-                
-                # Initialize indices for labeled and unlabeled sets
-                if len(L_total) < budget - int(budget * ood_rate):
-                    print("Warning: Not enough in-distribution samples for requested budget.")
-                    L_index = L_total  # Use all available in-distribution samples
-                else:
-                    L_index = random.sample(L_total, budget - int(budget * ood_rate))
-                
-                if len(O_total) < int(budget * ood_rate):
-                    print("Warning: Not enough OOD samples for requested budget.")
-                    O_index = O_total  # Use all available OOD samples
-                else:
-                    O_index = random.sample(O_total, int(budget * ood_rate))
-                
-                # Create unlabeled set
-                U_index = list(set(L_total + O_total) - set(L_index) - set(O_index))
-                
-                # Report statistics
-                if args.method == 'EPIG':
-                    print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(
-                        len(L_index), 
-                        len(O_index), 
-                        len(U_index) - args.num_IN_class * args.target_per_class
-                    ))
-                else:
-                    print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(
-                        len(L_index), 
-                        len(O_index), 
-                        len(U_index)
-                    ))
+        if args.openset:
+            # Handle text datasets differently
+            if args.textset:
+                L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
+                O_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] >= len(classes)]
             else:
-                # No open set (closed set scenario)
-                ood_rate = 0
-                O_index = []  # Initialize as empty list
-                
-                # Handle text datasets differently
-                if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
-                    L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
-                else:
-                    L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
-                
-                O_total = []
-                n_ood = 0
-                print("# Total in: {}, ood: {}".format(len(L_total), len(O_total)))
+                # Handle image datasets
+                L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
+                O_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] >= len(classes)]
 
+            # Calculate number of OOD samples based on ood_rate
+            n_ood = round(ood_rate * (len(L_total) + len(O_total)))
+
+            # Check if we have enough OOD samples
+            if n_ood > len(O_total):
+                print('The currently designed number of OOD samples is ' + str(n_ood) + ', but the actual number of OOD samples in the dataset is only ' + str(len(O_total)) + '.')
+                print('Using all OOD data and adjusting the ID data to maintain the OOD rate.')
+                n_ood = len(O_total)
+                n_id = round(len(O_total)/ood_rate - len(O_total))
                 # Make sure we don't sample more than available
-                budget_adjusted = min(int(budget), len(L_total))
-                if budget_adjusted < budget:
-                    print(f"Warning: Requested budget {budget} exceeds available samples {len(L_total)}.")
-                    print(f"Using all {len(L_total)} available samples.")
-                
-                L_index = random.sample(L_total, budget_adjusted)
-                U_index = list(set(L_total) - set(L_index))
-                
-                if args.method == 'EPIG':
-                    print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(
-                        len(L_index), 
-                        len(O_index), 
-                        len(U_index) - args.num_IN_class * args.target_per_class
-                    ))
-                else:
-                    print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(
-                        len(L_index), 
-                        len(O_index), 
-                        len(U_index)
-                    ))
+                n_id = min(n_id, len(L_total))
+                L_total = random.sample(L_total, n_id)
+            else:
+                # Sample OOD based on calculated number
+                O_total = random.sample(O_total, n_ood)
+            
+            print("# Total in: {}, ood: {}".format(len(L_total), len(O_total)))
+            
+            # Initialize indices for labeled and unlabeled sets
+            if len(L_total) < budget - int(budget * ood_rate):
+                print("Warning: Not enough in-distribution samples for requested budget.")
+                L_index = L_total  # Use all available in-distribution samples
+            else:
+                L_index = random.sample(L_total, budget - int(budget * ood_rate))
+            
+            if len(O_total) < int(budget * ood_rate):
+                print("Warning: Not enough OOD samples for requested budget.")
+                O_index = O_total  # Use all available OOD samples
+            else:
+                O_index = random.sample(O_total, int(budget * ood_rate))
+            
+            # Create unlabeled set
+            U_index = list(set(L_total + O_total) - set(L_index) - set(O_index))
+            
+            # Report statistics
+            if args.method == 'EPIG':
+                print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(
+                    len(L_index), 
+                    len(O_index), 
+                    len(U_index) - args.num_IN_class * args.target_per_class
+                ))
+            else:
+                print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(
+                    len(L_index), 
+                    len(O_index), 
+                    len(U_index)
+                ))
+        else:
+            # No open set (closed set scenario)
+            ood_rate = 0
+            O_index = []  # Initialize as empty list
+            
+            # Handle text datasets differently
+            if args.textset:
+                L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
+            else:
+                L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
+            
+            O_total = []
+            n_ood = 0
+            print("# Total in: {}, ood: {}".format(len(L_total), len(O_total)))
+
+            # Make sure we don't sample more than available
+            budget_adjusted = min(int(budget), len(L_total))
+            if budget_adjusted < budget:
+                print(f"Warning: Requested budget {budget} exceeds available samples {len(L_total)}.")
+                print(f"Using all {len(L_total)} available samples.")
+            
+            L_index = random.sample(L_total, budget_adjusted)
+            U_index = list(set(L_total) - set(L_index))
+            
+            if args.method == 'EPIG':
+                print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(
+                    len(L_index), 
+                    len(O_index), 
+                    len(U_index) - args.num_IN_class * args.target_per_class
+                ))
+            else:
+                print("# Labeled in: {}, ood: {}, Unlabeled: {}".format(
+                    len(L_index), 
+                    len(O_index), 
+                    len(U_index)
+                ))
 
         return L_index, O_index, U_index
     
@@ -147,7 +146,7 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index=None
         Q_index = list(Q_index)  # Ensure Q_index is a list
         
         # Get labels for query indices
-        if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+        if args.textset:
             Q_label = [dataset[i]['labels'] for i in Q_index]
         else:
             Q_label = [dataset[i][1] for i in Q_index]
@@ -183,10 +182,10 @@ def get_sub_test_dataset(args, dataset):
         Indices of in-distribution test samples
     """
     classes = args.target_list
-    
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TINYIMAGENET']:
-        labeled_index = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
-    if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+
+    if args.textset:
         labeled_index = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
+    else: # for image datasets
+        labeled_index = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
         
     return labeled_index

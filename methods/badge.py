@@ -17,7 +17,7 @@ class BADGE(ALMethod):
         self.models['backbone'].eval()
         device = self.args.device
         
-        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+        if self.args.textset:
             embDim = self.models['backbone'].config.hidden_size
         else:
             embDim = self.models['backbone'].get_embedding_dim()
@@ -36,7 +36,7 @@ class BADGE(ALMethod):
 
         offset = 0
         for i, data in tqdm(enumerate(unlabeled_loader), total=len(unlabeled_loader), desc="Computing Grad Features", unit="batch"):
-            if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            if self.args.textset:
             # Extract input_ids, attention_mask, and labels from the dictionary
                 input_ids = data['input_ids'].to(self.args.device)
                 attention_mask = data['attention_mask'].to(self.args.device)
@@ -61,7 +61,7 @@ class BADGE(ALMethod):
 
             grad_emb_batch = alpha * features  # [B, n_class, embDim]
 
-            if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            if self.args.textset:
                 grad_emb_batch = grad_emb_batch.view(len(input_ids), -1)
                 batch_size = len(input_ids)
             else:

@@ -158,7 +158,7 @@ class coremse(ALMethod):
             evaluated_instances = 0
             for batch_data in to_predict_dataloader:
                 with torch.no_grad():
-                    if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                    if self.args.textset:
                         input_ids = batch_data['input_ids'].to(self.args.device)
                         attention_mask = batch_data['attention_mask'].to(self.args.device)
                         logits = model(input_ids=input_ids, attention_mask=attention_mask).logits

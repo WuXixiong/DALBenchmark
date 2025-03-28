@@ -29,7 +29,7 @@ class AlphaMixSampling(ALMethod):
 		org_ulb_embedding = None
 
 		# get the last layer of the backbone
-		if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+		if self.args.textset:
 			old_fc = self.models['backbone'].classifier
 		else:
 			old_fc = self.models['backbone'].get_last_layer()
@@ -49,7 +49,7 @@ class AlphaMixSampling(ALMethod):
 			if i % self.args.print_freq == 0:
 				print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
 				with torch.no_grad():
-					if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+					if self.args.textset:
 					# Extract input_ids, attention_mask, and labels from the dictionary
 						input_ids = data['input_ids'].to(self.args.device)
 						attention_mask = data['attention_mask'].to(self.args.device)
@@ -84,7 +84,7 @@ class AlphaMixSampling(ALMethod):
 			if i % self.args.print_freq == 0:
 				print("| Selecting for batch [%3d/%3d]" % (i + 1, batch_num))
 				with torch.no_grad():
-					if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+					if self.args.textset:
 					# Extract input_ids, attention_mask, and labels from the dictionary
 						input_ids = data['input_ids'].to(self.args.device)
 						attention_mask = data['attention_mask'].to(self.args.device)

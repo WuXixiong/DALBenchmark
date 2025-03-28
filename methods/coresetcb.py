@@ -29,7 +29,7 @@ class CoresetCB(ALMethod):
             unlabeled_probs = []
             # Generate entire labeled_in features set
             for data in labeled_in_loader:
-                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                if self.args.textset:
                     input_ids = data['input_ids'].to(self.args.device)
                     attention_mask = data['attention_mask'].to(self.args.device)
                     outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
@@ -47,7 +47,7 @@ class CoresetCB(ALMethod):
     
             # Generate entire unlabeled features set
             for data in unlabeled_loader:
-                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                if self.args.textset:
                     input_ids = data['input_ids'].to(self.args.device)
                     attention_mask = data['attention_mask'].to(self.args.device)
                     outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
@@ -77,7 +77,7 @@ class CoresetCB(ALMethod):
             lamda = 20
 
         labelled_subset = torch.utils.data.Subset(self.unlabeled_dst, self.I_index)
-        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+        if self.args.textset:
             labelled_classes = [labelled_subset[i]['labels'] for i in range(len(labelled_subset))]
         else:
             labelled_classes = [labelled_subset[i][1] for i in range(len(labelled_subset))]

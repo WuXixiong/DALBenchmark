@@ -24,7 +24,7 @@ class EntropyCB(ALMethod):
 
             with torch.no_grad():
             # Extract input based on whether the dataset is text or image
-                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                if self.args.textset:
                     input_ids = data['input_ids'].to(self.args.device)
                     attention_mask = data['attention_mask'].to(self.args.device)
                     pred = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask).logits
@@ -48,7 +48,7 @@ class EntropyCB(ALMethod):
         ENT_Loss=[]
         # Adaptive counts of samples per cycle
         labelled_subset = torch.utils.data.Subset(self.unlabeled_dst, self.I_index)
-        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+        if self.args.textset:
             labelled_classes = [labelled_subset[i]['labels'] for i in range(len(labelled_subset))]
         else:
             labelled_classes = [labelled_subset[i][1] for i in range(len(labelled_subset))]
@@ -90,7 +90,7 @@ class EntropyCB(ALMethod):
             threshold = (2 * n / num_classes) + (self.cur_cycle + 1) * n / num_classes
             round=self.cur_cycle+1
             selected_subset = torch.utils.data.Subset(self.unlabeled_dst, indices)
-            if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            if self.args.textset:
                 selected_classes = [selected_subset[i]['labels'] for i in range(len(selected_subset))]
             else:    
                 selected_classes = [selected_subset[i][1] for i in range(len(selected_subset))] # self.Y[idxs_unlabeled[lb_flag]]

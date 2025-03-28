@@ -86,7 +86,7 @@ def train(args, models, criterion, optimizers, schedulers, dataloaders, writer=N
         writer = SummaryWriter(log_dir=log_dir)
 
     for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
-        if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:  # text dataset
+        if args.textset:  # text dataset
             epoch_loss, epoch_accuracy = train_epoch_nlp(args, models, criterion, optimizers, dataloaders, writer, epoch)
         else:
             epoch_loss, epoch_accuracy = train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch)

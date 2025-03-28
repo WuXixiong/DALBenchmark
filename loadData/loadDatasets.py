@@ -12,6 +12,7 @@ from ownDatasets.svhn import MySVHN
 from ownDatasets.agnews import MyAGNewsDataset
 from ownDatasets.imdb import MyIMDBDataset
 from ownDatasets.sst5 import MySST5Dataset
+from ownDatasets.dbpedia import MyDbpediaDataset
 
 # Import transforms
 from .dataTransform import get_dataset_transforms
@@ -58,7 +59,7 @@ def get_dataset(args, trial):
         train_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor)
         unlabeled_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor)
         test_set = MyTinyImageNet(tiny_imagenet_dataset['valid'], transform=test_transform, imbalance_factor=args.imb_factor)
-    elif args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+    if args.textset:
         # Load the text datasets
         if args.model == 'DistilBert':
             tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
@@ -67,20 +68,25 @@ def get_dataset(args, trial):
         
         # Initialize datasets for training, validation, and testing
         if args.dataset == 'SST5':
-            dataset = load_dataset('SetFit/sst5')
-            train_set = MySST5Dataset(dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
-            test_set = MySST5Dataset(dataset['test'], tokenizer, imbalance_factor=args.imb_factor)
-            unlabeled_set = MySST5Dataset(dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
+            sst5_dataset = load_dataset('SetFit/sst5')
+            train_set = MySST5Dataset(sst5_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
+            test_set = MySST5Dataset(sst5_dataset['test'], tokenizer, imbalance_factor=args.imb_factor)
+            unlabeled_set = MySST5Dataset(sst5_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
         elif args.dataset == 'IMDB':
             imdb_dataset = load_dataset('imdb')
-            train_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, max_length=128, imbalance_factor=args.imb_factor)
-            test_set = MyIMDBDataset(imdb_dataset['test'], tokenizer=tokenizer, max_length=128, imbalance_factor=args.imb_factor)
-            unlabeled_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, max_length=128, imbalance_factor=args.imb_factor)
+            train_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+            test_set = MyIMDBDataset(imdb_dataset['test'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+            unlabeled_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+        elif args.dataset == 'DBPEDIA':
+            dbpedia_dataset = load_dataset("fancyzhx/dbpedia_14")
+            train_set = MyDbpediaDataset(dbpedia_dataset['train'],tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+            test_set = MyDbpediaDataset(dbpedia_dataset['test'],tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+            unlabeled_set = MyDbpediaDataset(dbpedia_dataset['train'],tokenizer=tokenizer, imbalance_factor=args.imb_factor)
         else:  # AGNEWS
             agnews_dataset = load_dataset('ag_news')
-            train_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, max_length=128, imbalance_factor=args.imb_factor)
-            test_set = MyAGNewsDataset(agnews_dataset['test'], tokenizer=tokenizer, max_length=128, imbalance_factor=args.imb_factor)
-            unlabeled_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, max_length=128, imbalance_factor=args.imb_factor)
+            train_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+            test_set = MyAGNewsDataset(agnews_dataset['test'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+            unlabeled_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
 
     # Configure dataset settings based on type
     _configure_dataset_settings(args, trial)
@@ -150,6 +156,24 @@ def _configure_dataset_settings(args, trial):
                 [2, 3], [2, 4],
                 [3, 4]
             ]
+            if trial >= len(args.target_lists):
+                print(f"Warning: Trial {trial} exceeds available target lists. Using trial % len(target_lists).")
+            args.target_list = args.target_lists[trial % len(args.target_lists)]
+            args.num_IN_class = len(args.target_list)  # Update number of in-distribution classes
+        
+        # Calculate untarget_list (classes that will be treated as OOD)
+        args.untarget_list = list(np.setdiff1d(list(range(args.n_class)), list(args.target_list)))
+
+    elif args.dataset == 'DBPEDIA':
+        args.input_size = 128
+        # Set total number of classes (including OOD)
+        args.n_class = 14  # Total number of classes in SST5
+        args.target_list = list(range(14))  # All classes (for closed set)
+        args.num_IN_class = 14  # Number of in-distribution classes
+        
+        if args.openset:
+            # Define different class combinations for trials
+            args.target_lists = [[4, 2, 5, 7], [7, 1, 2, 5], [6, 4, 3, 2], [8, 9, 1, 3], [2, 9, 5, 3], [3, 6, 4, 7]]
             if trial >= len(args.target_lists):
                 print(f"Warning: Trial {trial} exceeds available target lists. Using trial % len(target_lists).")
             args.target_list = args.target_lists[trial % len(args.target_lists)]
@@ -253,7 +277,7 @@ def _apply_class_conversion(args, train_set, test_set, unlabeled_set):
         train_set.targets[np.where(train_set.targets == int(args.n_class))[0]] = int(args.num_IN_class)
         test_set.targets[np.where(test_set.targets == int(args.n_class))[0]] = int(args.num_IN_class)
     
-    elif args.dataset in ['SST5', 'AGNEWS', 'IMDB']:
+    if args.textset:
         # For text datasets, ensure proper handling of targets
         if hasattr(train_set, 'targets') and hasattr(test_set, 'targets'):
             # Convert targets to numpy arrays for easier manipulation if they're not already
@@ -297,17 +321,16 @@ def _report_split_statistics(args, unlabeled_set, test_set):
     """
     # Split Check and Reporting
     print("Target classes: ", args.target_list)
-    
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TINYIMAGENET', 'AGNEWS', 'IMDB', 'SST5']:
-        if args.method == 'EPIG':
-            uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
-            print("Train, # samples per class")
-            cnt -= args.target_per_class
-            print(uni, cnt)
-        else:    
-            uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
-            print("Train, # samples per class")
-            print(uni, cnt)
-        uni, cnt = np.unique(np.array(test_set.targets), return_counts=True)
-        print("Test, # samples per class")
+
+    if args.method == 'EPIG':
+        uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
+        print("Train, # samples per class")
+        cnt -= args.target_per_class
         print(uni, cnt)
+    else:    
+        uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
+        print("Train, # samples per class")
+        print(uni, cnt)
+    uni, cnt = np.unique(np.array(test_set.targets), return_counts=True)
+    print("Test, # samples per class")
+    print(uni, cnt)

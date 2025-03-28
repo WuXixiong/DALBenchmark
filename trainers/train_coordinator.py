@@ -77,7 +77,7 @@ def train_model(args, models, criterion, optimizers, schedulers, dataloaders, cr
     elif args.method in ['LFOSA', 'EOAL']:
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
             # Train the backbone model
-            if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:  # text dataset
+            if args.textset:  # text dataset
                 epoch_loss, epoch_accuracy = train_epoch_nlp(args, models, criterion, optimizers, dataloaders, writer, epoch)
             else:
                 epoch_loss, epoch_accuracy = train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch)
@@ -89,7 +89,7 @@ def train_model(args, models, criterion, optimizers, schedulers, dataloaders, cr
 
             # Train the OOD-specific part
             if args.method == 'LFOSA':
-                if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:  # text dataset
+                if args.textset:  # text dataset
                     train_epoch_lfosa_nlp(args, models, criterion, optimizers, dataloaders, criterion_xent, criterion_cent, optimizer_centloss)
                 else:
                     train_epoch_lfosa(args, models, criterion, optimizers, dataloaders, criterion_xent, criterion_cent, optimizer_centloss)
@@ -111,7 +111,7 @@ def train_model(args, models, criterion, optimizers, schedulers, dataloaders, cr
     elif args.method == 'MQNet':
         if args.mqnet_mode == "CONF":
             for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
-                if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:  # text dataset
+                if args.textset:  # text dataset
                     epoch_loss, epoch_accuracy = train_epoch_nlp(args, models, criterion, optimizers, dataloaders, writer, epoch)
                 else:
                     epoch_loss, epoch_accuracy = train_epoch(args, models, criterion, optimizers, dataloaders, writer, epoch)
@@ -137,7 +137,7 @@ def evaluate_model(args, models, dataloaders):
     Returns:
         Test accuracy
     """
-    if args.dataset in ['AGNEWS', 'IMDB', 'SST5']:  # text dataset
+    if args.textset:  # text dataset
         if 'ood_detection' in models and args.method in ['LFOSA', 'EOAL', 'PAL']:
             test_ood_nlp(args, models, dataloaders)
             return test_nlp(args, models, dataloaders)

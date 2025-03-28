@@ -26,7 +26,7 @@ class SAAL(ALMethod):
           - For text datasets: Each element in the list is a dictionary; stack each field to form a batched tensor.
           - For non-text datasets: Directly stack into a tensor.
         """
-        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+        if self.args.textset:
             return {
                 'input_ids': torch.stack([item['input_ids'] for item in batch_list]).to(self.args.device),
                 'attention_mask': torch.stack([item['attention_mask'] for item in batch_list]).to(self.args.device)
@@ -50,7 +50,7 @@ class SAAL(ALMethod):
         pool_data_dropout = []
         for idx in subpool_indices:
             data = self.unlabeled_dst[idx]
-            if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            if self.args.textset:
                 # Retain the complete dictionary data (including input_ids, attention_mask, etc.)
                 pool_data_dropout.append(data)
             else:
@@ -58,7 +58,7 @@ class SAAL(ALMethod):
                 pool_data_dropout.append(data[0].to(self.args.device))
         
         # For non-text datasets, stack the list into a tensor; for text datasets, keep as a list for batch processing
-        if self.args.dataset not in ['AGNEWS', 'IMDB', 'SST5']:
+        if not self.args.textset:
             pool_data_dropout = torch.stack(pool_data_dropout)
 
         # Compute the acquisition scores using the maximum sharpness function
@@ -86,7 +86,7 @@ class SAAL(ALMethod):
         """
         model = model.to(self.args.device)
         # Determine the data size based on the dataset type
-        if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+        if self.args.textset:
             data_size = len(pool_data_dropout)
         else:
             data_size = pool_data_dropout.shape[0]
@@ -110,7 +110,7 @@ class SAAL(ALMethod):
             batch = self.collate_batch(pool_data_dropout[start_idx:end_idx])
             
             with torch.no_grad():
-                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                if self.args.textset:
                     outputs = self.models['backbone'](input_ids=batch['input_ids'],
                                                       attention_mask=batch['attention_mask'])
                     logits = outputs.logits
@@ -140,7 +140,7 @@ class SAAL(ALMethod):
             # (b) Compute gradients for the batch
             model.zero_grad(set_to_none=True)
             with torch.enable_grad():
-                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                if self.args.textset:
                     outputs = self.models['backbone'](input_ids=batch['input_ids'],
                                                       attention_mask=batch['attention_mask'])
                     logits = outputs.logits
@@ -169,7 +169,7 @@ class SAAL(ALMethod):
 
             # (d) Compute the loss after perturbation
             with torch.no_grad():
-                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                if self.args.textset:
                     outputs = self.models['backbone'](input_ids=batch['input_ids'],
                                                       attention_mask=batch['attention_mask'])
                     logists_updated = outputs.logits

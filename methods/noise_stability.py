@@ -135,7 +135,7 @@ class noise_stability(ALMethod):
         model.eval()
         outputs = []
         for data in unlabeled_loader:
-            if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+            if self.args.textset:
                 # Extract input_ids and attention_mask, move to specified device
                 input_ids = data['input_ids'].to(self.args.device)
                 attention_mask = data['attention_mask'].to(self.args.device)

@@ -22,7 +22,7 @@ class LFOSA(ALMethod):
             S_ij = {}
             batch_num = len(selection_loader)
             for i, data in enumerate(selection_loader):
-                if self.args.dataset in ['AGNEWS', 'IMDB', 'SST5']:
+                if self.args.textset:
                     input_ids = data['input_ids'].to(self.args.device)
                     attention_mask = data['attention_mask'].to(self.args.device)
                     outputs = self.models['ood_detection'](input_ids=input_ids, attention_mask=attention_mask)

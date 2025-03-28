@@ -81,6 +81,7 @@ parser.add_argument('--alpha_learn_batch_size', type=int, default=1000000)
 # Basic arguments
 parser.add_argument('--n-initial', type=int, default=100, help='# of initial labelled samples')
 parser.add_argument('--dataset', type=str, default='CIFAR10', help='dataset') #CIFAR10, CIFAR100, ImageNet50
+parser.add_argument('--textset', action='store_true', help='text dataset')
 parser.add_argument('--data_path', type=str, default='data', help='dataset path')
 parser.add_argument('--gpu', default=[0], nargs="+", type=list, help='GPU id to use')
 parser.add_argument("--data-parallel", default=False, type=str_to_bool, help="whether parallel or not")
