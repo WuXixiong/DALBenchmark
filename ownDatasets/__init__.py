@@ -7,4 +7,4 @@ from .agnews import *
 from .imdb import *
 from .sst5 import *
 from .dbpedia import *
-# from .yelp import *
+from .yelp import *

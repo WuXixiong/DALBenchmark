@@ -13,6 +13,7 @@ from ownDatasets.agnews import MyAGNewsDataset
 from ownDatasets.imdb import MyIMDBDataset
 from ownDatasets.sst5 import MySST5Dataset
 from ownDatasets.dbpedia import MyDbpediaDataset
+from ownDatasets.yelp import MyYelpDataset
 
 # Import transforms
 from .dataTransform import get_dataset_transforms
@@ -72,6 +73,11 @@ def get_dataset(args, trial):
             train_set = MySST5Dataset(sst5_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
             test_set = MySST5Dataset(sst5_dataset['test'], tokenizer, imbalance_factor=args.imb_factor)
             unlabeled_set = MySST5Dataset(sst5_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
+        if args.dataset == 'YELP':
+            yelp_dataset = load_dataset("Yelp/yelp_review_full")
+            train_set = MyYelpDataset(yelp_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
+            test_set = MyYelpDataset(yelp_dataset['test'], tokenizer, imbalance_factor=args.imb_factor)
+            unlabeled_set = MyYelpDataset(yelp_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
         elif args.dataset == 'IMDB':
             imdb_dataset = load_dataset('imdb')
             train_set = MyIMDBDataset(imdb_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
@@ -142,6 +148,29 @@ def _configure_dataset_settings(args, trial):
         args.untarget_list = list(np.setdiff1d(list(range(args.n_class)), list(args.target_list)))
     
     elif args.dataset == 'SST5':
+        args.input_size = 128
+        # Set total number of classes (including OOD)
+        args.n_class = 5  # Total number of classes in SST5
+        args.target_list = list(range(5))  # All classes (for closed set)
+        args.num_IN_class = 5  # Number of in-distribution classes
+        
+        if args.openset:
+            # Define different class combinations for trials
+            args.target_lists = [
+                [0, 2], [0, 3], [0, 4], [0, 5],
+                [1, 2], [1, 3], [1, 4],
+                [2, 3], [2, 4],
+                [3, 4]
+            ]
+            if trial >= len(args.target_lists):
+                print(f"Warning: Trial {trial} exceeds available target lists. Using trial % len(target_lists).")
+            args.target_list = args.target_lists[trial % len(args.target_lists)]
+            args.num_IN_class = len(args.target_list)  # Update number of in-distribution classes
+        
+        # Calculate untarget_list (classes that will be treated as OOD)
+        args.untarget_list = list(np.setdiff1d(list(range(args.n_class)), list(args.target_list)))
+
+    elif args.dataset == 'YELP':
         args.input_size = 128
         # Set total number of classes (including OOD)
         args.n_class = 5  # Total number of classes in SST5
@@ -260,23 +289,7 @@ def _apply_class_conversion(args, train_set, test_set, unlabeled_set):
         test_set: Testing dataset
         unlabeled_set: Unlabeled dataset
     """
-    if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TINYIMAGENET']: 
-        # For standard image datasets
-        for i, c in enumerate(args.untarget_list):
-            # Mark untarget classes with temporary value (args.n_class)
-            train_set.targets[np.where(train_set.targets == c)[0]] = int(args.n_class)
-            test_set.targets[np.where(test_set.targets == c)[0]] = int(args.n_class)
 
-        # Sort target classes and relabel them from 0 to len(target_list)-1
-        args.target_list.sort()
-        for i, c in enumerate(args.target_list):
-            train_set.targets[np.where(train_set.targets == c)[0]] = i
-            test_set.targets[np.where(test_set.targets == c)[0]] = i
-
-        # Relabel OOD classes to num_IN_class
-        train_set.targets[np.where(train_set.targets == int(args.n_class))[0]] = int(args.num_IN_class)
-        test_set.targets[np.where(test_set.targets == int(args.n_class))[0]] = int(args.num_IN_class)
-    
     if args.textset:
         # For text datasets, ensure proper handling of targets
         if hasattr(train_set, 'targets') and hasattr(test_set, 'targets'):
@@ -306,6 +319,23 @@ def _apply_class_conversion(args, train_set, test_set, unlabeled_set):
             print("Warning: Text dataset structure does not have 'targets' attribute.")
             print("Please implement custom target conversion for this dataset structure.")
             # Implement custom conversion based on actual dataset structure
+
+    else: # for image datasets
+        # For standard image datasets
+        for i, c in enumerate(args.untarget_list):
+            # Mark untarget classes with temporary value (args.n_class)
+            train_set.targets[np.where(train_set.targets == c)[0]] = int(args.n_class)
+            test_set.targets[np.where(test_set.targets == c)[0]] = int(args.n_class)
+
+        # Sort target classes and relabel them from 0 to len(target_list)-1
+        args.target_list.sort()
+        for i, c in enumerate(args.target_list):
+            train_set.targets[np.where(train_set.targets == c)[0]] = i
+            test_set.targets[np.where(test_set.targets == c)[0]] = i
+
+        # Relabel OOD classes to num_IN_class
+        train_set.targets[np.where(train_set.targets == int(args.n_class))[0]] = int(args.num_IN_class)
+        test_set.targets[np.where(test_set.targets == int(args.n_class))[0]] = int(args.num_IN_class)
 
     # Copy train_set targets to unlabeled_set (with proper handling of array types)
     unlabeled_set.targets = train_set.targets.copy() if isinstance(train_set.targets, np.ndarray) else train_set.targets.copy()
