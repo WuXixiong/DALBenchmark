@@ -3,11 +3,10 @@ Training coordinator for managing different training methods.
 Provides a central entry point to train different methods.
 """
 import torch
-import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from trainers.base_trainer import train, train_epoch, train_epoch_nlp, test, test_nlp, test_ood, test_ood_nlp
+from trainers.base_trainer_tester import train, train_epoch, train_epoch_nlp, test, test_nlp, test_ood, test_ood_nlp
 from trainers.lfosa_trainer import train_epoch_lfosa, train_epoch_lfosa_nlp
 from trainers.eoal_trainer import train_epoch_eoal
 from trainers.ll_trainer import train_epoch_ll
@@ -18,7 +17,7 @@ from trainers.ccal_trainer import self_sup_train
 from utils.ema import ModelEMA
 from utils.wnet import set_Wnet
 
-def train_model(args, models, criterion, optimizers, schedulers, dataloaders, criterion_xent=None, 
+def train_model(args, trial, models, criterion, optimizers, schedulers, dataloaders, criterion_xent=None, 
                 criterion_cent=None, optimizer_centloss=None, O_index=None, cluster_centers=None, 
                 cluster_labels=None, cluster_indices=None):
     """
@@ -41,14 +40,14 @@ def train_model(args, models, criterion, optimizers, schedulers, dataloaders, cr
         cluster_indices: indices mapping to cluster labels (for EOAL)
     """
     print('>> Train a Model.')
-    log_dir = f'logs/tensorboard/{args.method}_experiment'
+    log_dir = f'logs/tensorboard/{args.dataset}/{args.method}/{trial}_experiment'
     writer = SummaryWriter(log_dir=log_dir)
 
     # Standard methods
     if args.method in ['Random', 'Uncertainty', 'Coreset', 'BADGE', 'CCAL', 'SIMILAR', 
                        'VAAL', 'WAAL', 'EPIG', 'EntropyCB', 'CoresetCB', 'AlphaMixSampling', 
                        'noise_stability', 'SAAL', 'VESSAL', 'corelog', 'coremse']:
-        train(args, models, criterion, optimizers, schedulers, dataloaders, writer)
+        train(args, trial, models, criterion, optimizers, schedulers, dataloaders, writer)
     
     # TIDAL method
     elif args.method == 'TIDAL':
@@ -56,6 +55,11 @@ def train_model(args, models, criterion, optimizers, schedulers, dataloaders, cr
             train_epoch_tidal(args, models, optimizers, dataloaders, epoch)
             schedulers['backbone'].step()
             schedulers['module'].step()
+            writer.add_scalar('learning_rate', schedulers['backbone'].get_last_lr()[0], epoch)
+            writer.add_scalar('training_loss', epoch_loss, epoch)
+            writer.add_scalar('accuracy', epoch_accuracy, epoch)
+
+        writer.close()
     
     # PAL method
     elif args.method == 'PAL':
@@ -72,6 +76,12 @@ def train_model(args, models, criterion, optimizers, schedulers, dataloaders, cr
             train_pal_meta_epoch(args, models, optimizers, dataloaders, coef, wnet, optimizer_wnet)
             train_pal_cls_epoch(args, models, optimizers, dataloaders, ema_model)
             schedulers['backbone'].step()
+
+            writer.add_scalar('learning_rate', schedulers['backbone'].get_last_lr()[0], epoch)
+            writer.add_scalar('training_loss', epoch_loss, epoch)
+            writer.add_scalar('accuracy', epoch_accuracy, epoch)
+
+        writer.close()
     
     # LFOSA and EOAL methods
     elif args.method in ['LFOSA', 'EOAL']:
@@ -106,6 +116,12 @@ def train_model(args, models, criterion, optimizers, schedulers, dataloaders, cr
             train_epoch_ll(args, models, epoch, criterion, optimizers, dataloaders)
             schedulers['backbone'].step()
             schedulers['module'].step()
+
+            writer.add_scalar('learning_rate', schedulers['backbone'].get_last_lr()[0], epoch)
+            writer.add_scalar('training_loss', epoch_loss, epoch)
+            writer.add_scalar('accuracy', epoch_accuracy, epoch)
+
+        writer.close()
     
     # MQNet method
     elif args.method == 'MQNet':
@@ -121,6 +137,12 @@ def train_model(args, models, criterion, optimizers, schedulers, dataloaders, cr
                 train_epoch_ll(args, models, epoch, criterion, optimizers, dataloaders)
                 schedulers['backbone'].step()
                 schedulers['module'].step()
+
+            writer.add_scalar('learning_rate', schedulers['backbone'].get_last_lr()[0], epoch)
+            writer.add_scalar('training_loss', epoch_loss, epoch)
+            writer.add_scalar('accuracy', epoch_accuracy, epoch)
+
+        writer.close()
 
     print('>> Finished.')
 

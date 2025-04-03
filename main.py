@@ -108,16 +108,15 @@ if __name__ == '__main__':
 
             # Training
             t = time.time()
-            train_model(args, models, criterion, optimizers, schedulers, dataloaders, 
+            train_model(args, trial + 1, models, criterion, optimizers, schedulers, dataloaders, 
                       criterion_xent, criterion_cent, optimizer_centloss, 
                       O_index, cluster_centers, cluster_labels, cluster_indices)
             print("cycle: {}, elapsed time: {}".format(cycle, (time.time() - t)))
 
             # Test
-            acc = evaluate_model(args, models, dataloaders)
-
-            print('Trial {}/{} || Cycle {}/{} || Labeled IN size {}: Test acc {}'.format(
-                    trial + 1, args.trial, cycle + 1, args.cycle, len(I_index), acc), flush=True)
+            print('Trial {}/{} || Cycle {}/{} || Labeled IN size {}: '.format(
+                    trial + 1, args.trial, cycle + 1, args.cycle, len(I_index)), flush=True)
+            acc, prec, recall, f1  = evaluate_model(args, models, dataloaders)
 
             #### AL Query ####
             print("==========Start Querying==========")
@@ -164,7 +163,7 @@ if __name__ == '__main__':
                 dataloaders['ood'] = DataLoader(train_dst, sampler=ood_query, batch_size=args.batch_size, num_workers=args.workers)
 
             # Log cycle information
-            log_cycle_info(logs, cycle, acc, in_cnt, class_counts)
+            log_cycle_info(logs, cycle, acc, prec, recall, f1, in_cnt, class_counts)
 
         # Save logs after all cycles
         save_logs(logs, args, trial)

@@ -24,22 +24,22 @@ def initialize_log(args, trial):
     logs.append(["Number of total epochs each cycle:" + str(args.epochs)])
     logs.append(["Initial training set size:" + str(args.n_initial)])
     logs.append([])
-    logs.append(['Cycle | ', 'Test Accuracy | ', 'Number of in-domain query data | ', 'Queried Classes'])
+    logs.append(['Cycle | ', 'Test Accuracy | ', 'Precision | ', 'Recall | ', 'F1-Score | ', 'Number of in-domain query data | ', 'Queried Classes'])
     return logs
 
-def log_cycle_info(logs, cycle, acc, in_cnt, class_counts):
+def log_cycle_info(logs, cycle, acc, prec, recall, f1, in_cnt, class_counts):
     from collections import Counter
     my_dict = dict(Counter(class_counts))
     sorted_dict = dict(sorted(my_dict.items()))
-    logs.append([cycle + 1, acc, in_cnt, sorted_dict])
+    logs.append([cycle + 1, acc, prec, recall, f1, in_cnt, sorted_dict])
 
 def save_logs(logs, args, trial):
-    file_name = f'logs/{args.dataset}/{args.n_query}/open_set/r{args.ood_rate}_t{trial}_{args.method}'
+    file_name = f'logs/{args.dataset}/{args.n_query}/open_set/r{args.ood_rate}_t{trial+1}_{args.method}'
 
     if not args.openset and not args.imbalanceset:
-        file_name = f'logs/{args.dataset}/{args.n_query}/close_balance_set_t{trial}_{args.method}'
+        file_name = f'logs/{args.dataset}/{args.n_query}/close_balance_set_t{trial+1}_{args.method}'
     if args.imbalanceset:
-        file_name = f'logs/{args.dataset}/{args.n_query}/imbalance_set/_t{trial}_{args.method}'
+        file_name = f'logs/{args.dataset}/{args.n_query}/imbalance_set/_t{trial+1}_{args.method}'
 
     if args.method == 'MQNet':
         file_name = f'{file_name}_{args.mqnet_mode}_v3_b64'

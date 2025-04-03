@@ -1,4 +1,4 @@
-from trainers.base_trainer import *
+from trainers.base_trainer_tester import *
 from trainers.ccal_trainer import *
 from trainers.eoal_trainer import *
 from trainers.lfosa_trainer import *
@@ -6,4 +6,4 @@ from trainers.ll_trainer import *
 from trainers.mqnet_trainer import *
 from trainers.pal_trainer import *
 from trainers.tidal_trainer import *
-from trainers.train_coordinator import *
+from trainers.train_test_coordinator import *

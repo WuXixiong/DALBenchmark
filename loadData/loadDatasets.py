@@ -60,6 +60,7 @@ def get_dataset(args, trial):
         train_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor, method=args.method)
         unlabeled_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
         test_set = MyTinyImageNet(tiny_imagenet_dataset['valid'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
+
     if args.textset:
         # Load the text datasets
         if args.model == 'DistilBert':
@@ -73,7 +74,7 @@ def get_dataset(args, trial):
             train_set = MySST5Dataset(sst5_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
             test_set = MySST5Dataset(sst5_dataset['test'], tokenizer, imbalance_factor=args.imb_factor)
             unlabeled_set = MySST5Dataset(sst5_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
-        if args.dataset == 'YELP':
+        elif args.dataset == 'YELP':
             yelp_dataset = load_dataset("Yelp/yelp_review_full")
             train_set = MyYelpDataset(yelp_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
             test_set = MyYelpDataset(yelp_dataset['test'], tokenizer, imbalance_factor=args.imb_factor)
@@ -88,11 +89,14 @@ def get_dataset(args, trial):
             train_set = MyDbpediaDataset(dbpedia_dataset['train'],tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             test_set = MyDbpediaDataset(dbpedia_dataset['test'],tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             unlabeled_set = MyDbpediaDataset(dbpedia_dataset['train'],tokenizer=tokenizer, imbalance_factor=args.imb_factor)
-        else:  # AGNEWS
+        elif args.dataset == 'AGNEWS':
             agnews_dataset = load_dataset('ag_news')
             train_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             test_set = MyAGNewsDataset(agnews_dataset['test'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             unlabeled_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+
+        else:
+            raise ValueError(f"Dataset '{args.dataset}' is not supported. Please choose from the available datasets.")
 
     # Configure dataset settings based on type
     _configure_dataset_settings(args, trial)
