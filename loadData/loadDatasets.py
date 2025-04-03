@@ -36,14 +36,14 @@ def get_dataset(args, trial):
     # Dataset loading
     if args.dataset == 'CIFAR10':
         cifar10_dataset = load_dataset('cifar10')
-        train_set = MyCIFAR10(cifar10_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor)
-        unlabeled_set = MyCIFAR10(cifar10_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor)
-        test_set = MyCIFAR10(cifar10_dataset['test'], transform=test_transform, imbalance_factor=args.imb_factor)
+        train_set = MyCIFAR10(cifar10_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor, method=args.method)
+        unlabeled_set = MyCIFAR10(cifar10_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
+        test_set = MyCIFAR10(cifar10_dataset['test'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
     elif args.dataset == 'CIFAR100':
         cifar100_dataset = load_dataset('cifar100')
-        train_set = MyCIFAR100(cifar100_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor)
-        unlabeled_set = MyCIFAR100(cifar100_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor)
-        test_set = MyCIFAR100(cifar100_dataset['test'], transform=test_transform, imbalance_factor=args.imb_factor)
+        train_set = MyCIFAR100(cifar100_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor, method=args.method)
+        unlabeled_set = MyCIFAR100(cifar100_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
+        test_set = MyCIFAR100(cifar100_dataset['test'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
     elif args.dataset == 'MNIST':
         mnist_dataset = load_dataset('mnist')
         train_set = MyMNIST(mnist_dataset['train'], transform=train_transform)
@@ -57,9 +57,9 @@ def get_dataset(args, trial):
     elif args.dataset == 'TINYIMAGENET':
         # TinyImageNet is not directly available in Hugging Face datasets
         tiny_imagenet_dataset = load_dataset('zh-plus/tiny-imagenet')
-        train_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor)
-        unlabeled_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor)
-        test_set = MyTinyImageNet(tiny_imagenet_dataset['valid'], transform=test_transform, imbalance_factor=args.imb_factor)
+        train_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor, method=args.method)
+        unlabeled_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
+        test_set = MyTinyImageNet(tiny_imagenet_dataset['valid'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
     if args.textset:
         # Load the text datasets
         if args.model == 'DistilBert':

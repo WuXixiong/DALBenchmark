@@ -32,7 +32,15 @@ class SAAL(ALMethod):
                 'attention_mask': torch.stack([item['attention_mask'] for item in batch_list]).to(self.args.device)
             }
         else:
-            return torch.stack(batch_list).to(self.args.device)
+            # Check if batch_list is already a tensor
+            if isinstance(batch_list, torch.Tensor):
+                return batch_list.to(self.args.device)
+            # Check if it's a list of one tensor
+            elif len(batch_list) == 1 and isinstance(batch_list[0], torch.Tensor):
+                return batch_list[0].to(self.args.device)
+            # Otherwise, try to stack as normal
+            else:
+                return torch.stack(batch_list).to(self.args.device)
 
     def select(self, **kwargs):
         selected_indices, scores = self.run()
