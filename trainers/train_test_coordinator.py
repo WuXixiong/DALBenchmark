@@ -52,7 +52,7 @@ def train_model(args, trial, models, criterion, optimizers, schedulers, dataload
     # TIDAL method
     elif args.method == 'TIDAL':
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
-            train_epoch_tidal(args, models, optimizers, dataloaders, epoch)
+            epoch_loss, epoch_accuracy = train_epoch_tidal(args, models, optimizers, dataloaders, epoch)
             schedulers['backbone'].step()
             schedulers['module'].step()
             writer.add_scalar('learning_rate', schedulers['backbone'].get_last_lr()[0], epoch)
@@ -61,27 +61,6 @@ def train_model(args, trial, models, criterion, optimizers, schedulers, dataload
 
         writer.close()
     
-    # PAL method
-    elif args.method == 'PAL':
-        wnet, optimizer_wnet = set_Wnet(args, (args.num_IN_class+1)*2)
-        wnet.train()
-        
-        if args.use_ema:
-            ema_model = ModelEMA(args, models['backbone'], args.ema_decay)
-        else:
-            ema_model = None
-            
-        for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
-            coef = torch.exp(-5 * (min(1 - epoch/args.epochs, 1)) ** 2)
-            train_pal_meta_epoch(args, models, optimizers, dataloaders, coef, wnet, optimizer_wnet)
-            train_pal_cls_epoch(args, models, optimizers, dataloaders, ema_model)
-            schedulers['backbone'].step()
-
-            writer.add_scalar('learning_rate', schedulers['backbone'].get_last_lr()[0], epoch)
-            writer.add_scalar('training_loss', epoch_loss, epoch)
-            writer.add_scalar('accuracy', epoch_accuracy, epoch)
-
-        writer.close()
     
     # LFOSA and EOAL methods
     elif args.method in ['LFOSA', 'EOAL']:
@@ -113,7 +92,7 @@ def train_model(args, trial, models, criterion, optimizers, schedulers, dataload
     # Learning Loss (LL) method
     elif args.method == 'LL':
         for epoch in tqdm(range(args.epochs), leave=False, total=args.epochs):
-            train_epoch_ll(args, models, epoch, criterion, optimizers, dataloaders)
+            epoch_loss, epoch_accuracy = train_epoch_ll(args, models, epoch, criterion, optimizers, dataloaders)
             schedulers['backbone'].step()
             schedulers['module'].step()
 
