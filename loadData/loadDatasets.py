@@ -33,7 +33,7 @@ def get_dataset(args, trial):
     if args.dataset in ['CIFAR10', 'CIFAR100', 'MNIST', 'SVHN', 'TINYIMAGENET']:
         train_transform, test_transform = get_dataset_transforms(args.dataset)
     
-    # Dataset loading
+# Dataset loading
     if args.dataset == 'CIFAR10':
         cifar10_dataset = load_dataset('cifar10')
         train_set = MyCIFAR10(cifar10_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor, method=args.method)
@@ -60,15 +60,13 @@ def get_dataset(args, trial):
         train_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=train_transform, imbalance_factor=args.imb_factor, method=args.method)
         unlabeled_set = MyTinyImageNet(tiny_imagenet_dataset['train'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
         test_set = MyTinyImageNet(tiny_imagenet_dataset['valid'], transform=test_transform, imbalance_factor=args.imb_factor, method=args.method)
-
-    if args.textset:
+    elif args.textset:
         # Load the text datasets
         if args.model == 'DistilBert':
             tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
         elif args.model == 'Roberta':
             tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
         
-        # Initialize datasets for training, validation, and testing
         if args.dataset == 'SST5':
             sst5_dataset = load_dataset('SetFit/sst5')
             train_set = MySST5Dataset(sst5_dataset['train'], tokenizer, imbalance_factor=args.imb_factor)
@@ -94,9 +92,10 @@ def get_dataset(args, trial):
             train_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             test_set = MyAGNewsDataset(agnews_dataset['test'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             unlabeled_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
-
         else:
-            raise ValueError(f"Dataset '{args.dataset}' is not supported. Please choose from the available datasets.")
+            raise ValueError(f"Text dataset '{args.dataset}' is not supported. Please choose from the available text datasets.")
+    else:
+        raise ValueError(f"Dataset '{args.dataset}' is not supported. Please choose from the available datasets.")
 
     # Configure dataset settings based on type
     _configure_dataset_settings(args, trial)

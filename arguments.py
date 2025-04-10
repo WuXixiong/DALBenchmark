@@ -96,7 +96,7 @@ parser.add_argument('--model', type=str, default='ResNet18', help='model')
 parser.add_argument('--print_freq', '-p', default=300, type=int, help='print frequency (default: 20)')
 parser.add_argument('--seed', default=0, type=int, help="random seed")
 parser.add_argument('-j', '--workers', default=5, type=int, help='number of data loading workers (default: 4)')
-parser.add_argument("--ssl-save", default=True, type=str_to_bool, help="whether save ssl model or not")
+parser.add_argument("--no-ssl-save", action="store_false", dest="ssl_save", help="disable saving ssl model (saves by default)")
 
 # Optimizer and scheduler
 parser.add_argument('--optimizer', default="SGD", help='optimizer to use, e.g. SGD, Adam')

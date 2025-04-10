@@ -1,5 +1,5 @@
 """
-Training functionality for CCAL (Contrastive Coding for Active Learning) method.
+Training functionality for CCAL method.
 """
 import torch
 import torch.nn as nn
@@ -175,7 +175,16 @@ def self_sup_train(args, trial, models, optimizers, schedulers, train_dst, I_ind
 
             # SSL save
             if args.ssl_save == True:
+                # Create directory for semantic_path if it doesn't exist
+                semantic_dir = os.path.dirname(semantic_path)
+                if not os.path.exists(semantic_dir):
+                    os.makedirs(semantic_dir)
                 torch.save(models['semantic'].state_dict(), semantic_path)
+                
+                # Create directory for distinctive_path if it doesn't exist
+                distinctive_dir = os.path.dirname(distinctive_path)
+                if not os.path.exists(distinctive_dir):
+                    os.makedirs(distinctive_dir)
                 torch.save(models['distinctive'].state_dict(), distinctive_path)
 
     elif args.method == 'MQNet':
@@ -214,6 +223,9 @@ def self_sup_train(args, trial, models, optimizers, schedulers, train_dst, I_ind
 
             # SSL save
             if args.ssl_save == True:
+                save_dir = os.path.dirname(model_path)
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
                 torch.save(models['csi'].state_dict(), model_path)
 
     return models
