@@ -32,8 +32,19 @@ class noise_stability(ALMethod):
         outputs = torch.tensor([]).to(self.args.device)
         with torch.no_grad():
             for data in loader:
-                inputs = data[0].to(self.args.device)
-                out, fea = model(inputs) 
+                # inputs = data[0].to(self.args.device)
+                # out, fea = model(inputs) 
+                # Extract input based on whether the dataset is text or image
+                if self.args.textset:
+                    input_ids = data['input_ids'].to(self.args.device)
+                    attention_mask = data['attention_mask'].to(self.args.device)
+                    out = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
+                    hidden_states = out.hidden_states
+                    last_hidden_state = hidden_states[-1]
+                    fea = last_hidden_state[:, 0, :]
+                else:
+                    inputs = data[0].to(self.args.device)
+                    out, fea = model(inputs)
                 if use_feature:
                     out = fea
                 else:

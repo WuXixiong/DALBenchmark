@@ -34,17 +34,24 @@ def log_cycle_info(logs, cycle, acc, prec, recall, f1, in_cnt, class_counts):
     logs.append([cycle + 1, acc, prec, recall, f1, in_cnt, sorted_dict])
 
 def save_logs(logs, args, trial):
-    file_name = f'logs/{args.dataset}/{args.n_query}/open_set/r{args.ood_rate}_t{trial+1}_{args.method}'
-
-    if not args.openset and not args.imbalanceset:
-        file_name = f'logs/{args.dataset}/{args.n_query}/close_balance_set_t{trial+1}_{args.method}'
-    if args.imbalanceset:
-        file_name = f'logs/{args.dataset}/{args.n_query}/imbalance_set/_t{trial+1}_{args.method}'
-
+    # Base directory structure
+    base_dir = f'logs/{args.dataset}/{args.n_query}'
+    
+    # Determine the dataset type part of the path
+    if args.openset:
+        dataset_type = f'open_set/r{args.ood_rate}'
+    elif args.imb_factor:
+        dataset_type = f'imbalance_set/r{args.imb_factor}'
+    else:
+        dataset_type = 'close_balance_set'
+    
+    # Construct the base filename
+    file_name = f'{base_dir}/{dataset_type}_t{trial+1}_{args.method}'
+    
+    # Add method-specific suffixes
     if args.method == 'MQNet':
         file_name = f'{file_name}_{args.mqnet_mode}_v3_b64'
-
-    if args.method == 'Uncertainty':
+    elif args.method == 'Uncertainty':
         file_name = f'{file_name}_{args.uncertainty}'
 
     # Ensure the directory exists before saving the file

@@ -90,7 +90,7 @@ parser.add_argument('--n-class', type=int, default=10, help='# of classes') # or
 parser.add_argument('--trial', type=int, default=5, help='# of runs')
 parser.add_argument('--cycle', type=int, default=10, help='# of AL cycles')
 parser.add_argument('--n-query', type=int, default=1000, help='# of query samples')
-parser.add_argument('--subset', type=int, default=50000, help='subset')
+parser.add_argument('--subset', type=int, default=5000000000, help='subset')
 parser.add_argument('--resolution', type=int, default=32, help='resolution') # 32
 parser.add_argument('--model', type=str, default='ResNet18', help='model')
 parser.add_argument('--print_freq', '-p', default=300, type=int, help='print frequency (default: 20)')

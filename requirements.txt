@@ -1,8 +1,8 @@
 --index-url https://download.pytorch.org/whl/cu121
+--extra-index-url https://pypi.org/simple
 torch==2.2.2
 torchvision==0.17.2
 torchaudio==2.2.2
---index-url https://pypi.org/simple
 torchtext==0.17.2
 torchdata==0.7.1
 portalocker==2.10.1
@@ -178,4 +178,5 @@ zipp==3.17.0
 seaborn==0.13.2
 tensorboard==2.18.0
 transformers==4.46.2
-datasets
+datasets==3.4.1
+torchlars==0.1.2

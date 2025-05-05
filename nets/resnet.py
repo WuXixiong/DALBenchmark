@@ -129,6 +129,9 @@ class ResNet_224x224(resnet.ResNet):
     def get_last_layer(self):
         return self.fc
 
+    def forward(self, x, method=None):
+        return self._forward_impl(x, method)
+
     def _forward_impl(self, x: Tensor, method=None) -> Tensor:
         # See note [TorchScript super()]
         with set_grad_enabled(not self.no_grad):
