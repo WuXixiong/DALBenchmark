@@ -11,12 +11,13 @@ import torch.nn.functional as F
 class corelog(ALMethod):
     def __init__(self, args, models, unlabeled_dst, U_index, **kwargs):
         super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
-		# subset settings
+        self.is_multilabel = getattr(args, 'is_multilabel', False)
+        # subset settings
         subset_idx = np.random.choice(len(self.U_index), size=(min(self.args.subset, len(self.U_index)),), replace=False)
         self.U_index_sub = np.array(self.U_index)[subset_idx]
 
     def run(self):
-        selection_indices = self.rank_uncertainty()  # Already the final seleced indices
+        selection_indices = self.rank_uncertainty()  # Already the final selected indices
         return selection_indices, None 
     
     def rank_uncertainty(self):
@@ -144,6 +145,8 @@ class corelog(ALMethod):
         """
         Set model to train() to activate dropout, perform n_drop forward passes,
         and return a probability tensor of shape (n_drop, dataset_size, num_classes).
+        
+        Modified to support both single-label and multi-label tasks.
         """
         model = self.models['backbone'].to(self.args.device)
         model.train()  # VERY IMPORTANT: This activates dropout
@@ -151,7 +154,7 @@ class corelog(ALMethod):
         n_classes = len(self.args.target_list)
         probs = torch.zeros([n_drop, len(to_predict_dataset), n_classes], device=self.args.device)
 
-        print('Processing Monte Carlo dropout...')
+        print(f'Processing Monte Carlo dropout for {"multi-label" if self.is_multilabel else "single-label"} task...')
         # Re-sample n_drop times
         for i in tqdm(range(n_drop)):
             evaluated_instances = 0
@@ -161,13 +164,34 @@ class corelog(ALMethod):
                         input_ids = batch_data['input_ids'].to(self.args.device)
                         attention_mask = batch_data['attention_mask'].to(self.args.device)
                         logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
-                        pred_probs = torch.softmax(logits, dim=-1)
                         batch_size = input_ids.size(0)
                     else:
                         inputs = batch_data[0].to(self.args.device)
                         logits, _ = model(inputs)
-                        pred_probs = torch.softmax(logits, dim=1)
                         batch_size = inputs.size(0)
+
+                    # Convert logits to probabilities based on task type
+                    if self.is_multilabel:
+                        # For multi-label: use independent sigmoid probabilities
+                        pred_probs = torch.sigmoid(logits)
+                        
+                        # Optional: Normalize probabilities to ensure they form a valid probability distribution
+                        # For information-theoretic methods like CoreLOG, this helps maintain theoretical soundness
+                        if getattr(self.args, 'corelog_normalize_multilabel', True):
+                            # Method 1: Normalize each sample's probabilities to sum to 1
+                            # This maintains the relative confidence while ensuring valid probability distribution
+                            pred_probs = pred_probs / (pred_probs.sum(dim=-1, keepdim=True) + 1e-10)
+                            
+                        # Alternative normalization approaches:
+                        # Method 2: Use softmax on the sigmoid outputs (more aggressive normalization)
+                        # pred_probs = torch.softmax(pred_probs, dim=-1)
+                        
+                        # Method 3: Keep sigmoid as-is (independent probabilities, may not sum to 1)
+                        # pred_probs = torch.sigmoid(logits)  # Already computed above
+                        
+                    else:
+                        # For single-label: use standard softmax
+                        pred_probs = torch.softmax(logits, dim=-1)
 
                     # Accumulate and store probabilities
                     start_slice = evaluated_instances
@@ -175,9 +199,17 @@ class corelog(ALMethod):
                     probs[i, start_slice:end_slice, :] = pred_probs
                     evaluated_instances = end_slice
 
+        print(f'CoreLOG probability computation completed:')
+        print(f'  Task type: {"Multi-label" if self.is_multilabel else "Single-label"}')
+        print(f'  Probability tensor shape: {probs.shape}')
+        print(f'  Sample probability range: [{probs.min().item():.4f}, {probs.max().item():.4f}]')
+        if self.is_multilabel:
+            print(f'  Average probability sum per sample: {probs.sum(dim=-1).mean().item():.4f}')
+
         return probs
 
 def random_generator_for_x_prime(x_dim, size):
+    """Generate random indices for x' selection."""
     num_to_sample = max(round(x_dim * size), 1)
     sample_indices = random.sample(range(0, x_dim), num_to_sample)
     return sorted(sample_indices)
@@ -185,6 +217,7 @@ def random_generator_for_x_prime(x_dim, size):
 def clustering(rr_X_Xp, probs_B_K_C, T, batch_size):
     """
     Perform top-k selection on rr_X_Xp followed by k-means clustering.
+    This function works identically for both single-label and multi-label tasks.
     """
     # First, sum rr_X_Xp along the last dimension, essentially scoring the data.
     rr_X = torch.sum(rr_X_Xp, dim=-1)
@@ -226,6 +259,7 @@ def kmeans(rr, k):
     # If the actual number of valid vectors is smaller than k, dynamically reduce k.
     if len(rr_unique) < k:
         k = len(rr_unique)
+        print(f"Warning: Reducing k from {k} to {len(rr_unique)} due to insufficient unique samples")
     
     # 2) Perform k-means clustering using the unique vectors to avoid warnings from scikit-learn.
     kmeans_model = KMeans(n_clusters=k, random_state=0).fit(rr_unique)
@@ -246,7 +280,10 @@ def kmeans(rr, k):
     if m > 0:
         print(f"Warning: {m} centroids are missing due to duplicate data. Randomly selecting from the remaining points.")
         pool = np.delete(np.arange(len(rr)), centroids_set)
-        p = np.random.choice(len(pool), m, replace=False)
-        centroids = np.concatenate((centroids, pool[p]), axis=None)
+        if len(pool) > 0:
+            p = np.random.choice(len(pool), min(m, len(pool)), replace=False)
+            centroids = np.concatenate((centroids, pool[p]), axis=None)
+        else:
+            print(f"Warning: No remaining points available for random selection")
 
     return centroids

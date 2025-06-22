@@ -14,6 +14,7 @@ from tqdm import tqdm
 class SAAL(ALMethod):
     def __init__(self, args, models, unlabeled_dst, U_index, **kwargs):
         super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
+        self.is_multilabel = getattr(args, 'is_multilabel', False)
         # Randomly select only a portion of the unlabeled data
         subset_idx = np.random.choice(len(self.U_index),
                                       size=(min(self.args.subset, len(self.U_index)),),
@@ -50,7 +51,7 @@ class SAAL(ALMethod):
     def run(self):
         # Set the backbone model to evaluation mode
         self.models['backbone'].eval()
-        print('...Acquisition Only')
+        print(f'...SAAL Acquisition ({"multi-label" if self.is_multilabel else "single-label"})')
 
         # Optionally sample only a subset of data; the original code samples from the entire U_index
         subpool_indices = random.sample(self.U_index, self.args.pool_subset)
@@ -85,12 +86,66 @@ class SAAL(ALMethod):
             pool_index = points_of_interest.argsort()[::-1][:int(self.args.n_query)]
 
         pool_index = torch.from_numpy(pool_index)
+        
+        print(f"SAAL selection completed:")
+        print(f"  Selected {len(pool_index)} samples")
+        print(f"  Task type: {'Multi-label' if self.is_multilabel else 'Single-label'}")
+        
         return pool_index.cpu().tolist(), None  # Return index and score (score is None here)
+
+    def generate_pseudo_labels(self, logits):
+        """
+        Generate pseudo-labels based on task type.
+        
+        Args:
+            logits: Model output logits
+            
+        Returns:
+            pseudo_target: Pseudo-labels for the batch
+        """
+        if self.is_multilabel:
+            # For multi-label: use sigmoid and threshold-based pseudo-labels
+            probs = torch.sigmoid(logits)
+            threshold = getattr(self.args, 'saal_multilabel_threshold', 0.5)
+            pseudo_target = (probs > threshold).float()
+        else:
+            # For single-label: use argmax of softmax
+            softmaxed = F.softmax(logits, dim=1)
+            pseudo_target = softmaxed.argmax(dim=1)
+        
+        return pseudo_target
+
+    def compute_loss(self, logits, target):
+        """
+        Compute loss based on task type.
+        
+        Args:
+            logits: Model output logits
+            target: Target labels (pseudo or true)
+            
+        Returns:
+            loss: Computed loss tensor
+        """
+        if self.is_multilabel:
+            # For multi-label: use BCE loss
+            criterion = nn.BCEWithLogitsLoss(reduction='none')
+            target = target.float()
+            loss = criterion(logits, target)
+            # Sum across classes to get per-sample loss
+            loss = loss.sum(dim=1)
+        else:
+            # For single-label: use CrossEntropy loss
+            criterion = nn.CrossEntropyLoss(reduction='none')
+            target = target.long()
+            loss = criterion(logits, target)
+        
+        return loss
 
     def max_sharpness_acquisition_pseudo(self, pool_data_dropout, args, model):
         """
         Compute (i) the original loss and (ii) the loss after a small parameter perturbation.
         Depending on acqMode, return different scores such as 'Max' or 'Diff'.
+        Modified to support both single-label and multi-label tasks.
         """
         model = model.to(self.args.device)
         # Determine the data size based on the dataset type
@@ -100,18 +155,23 @@ class SAAL(ALMethod):
             data_size = pool_data_dropout.shape[0]
 
         # Tensor to store pseudo-labels
-        pool_pseudo_target_dropout = torch.zeros(data_size, dtype=torch.long, device=self.args.device)
+        if self.is_multilabel:
+            # For multi-label: pseudo-labels are multi-hot vectors
+            num_classes = getattr(args, 'num_IN_class', args.n_class)
+            pool_pseudo_target_dropout = torch.zeros(data_size, num_classes, device=self.args.device)
+        else:
+            # For single-label: pseudo-labels are class indices
+            pool_pseudo_target_dropout = torch.zeros(data_size, dtype=torch.long, device=self.args.device)
+        
         original_loss_list = []
         max_perturbed_loss_list = []
 
         # Process data in batches to avoid excessive GPU memory usage
         num_batch = int(np.ceil(data_size / args.pool_batch_size))
-        
-        # Initialize criterion once outside the loop to improve efficiency
-        criterion = nn.CrossEntropyLoss(reduction='none')
 
         # ---------- 1) First, compute the original loss and obtain pseudo-labels ----------
         model.eval()
+        print(f"Computing original loss for SAAL ({'multi-label' if self.is_multilabel else 'single-label'})...")
         for idx in tqdm(range(num_batch), desc="Computing original loss"):
             start_idx = idx * args.pool_batch_size
             end_idx = min((idx + 1) * args.pool_batch_size, data_size)
@@ -125,17 +185,19 @@ class SAAL(ALMethod):
                 else:
                     logits, _ = self.models['backbone'](batch)
                 
-                softmaxed = F.softmax(logits, dim=1)
-                pseudo_target = softmaxed.argmax(dim=1)
+                # Generate pseudo-labels based on task type
+                pseudo_target = self.generate_pseudo_labels(logits)
                 pool_pseudo_target_dropout[start_idx:end_idx] = pseudo_target
 
-            loss = criterion(logits, pseudo_target)
+            # Compute loss based on task type
+            loss = self.compute_loss(logits, pseudo_target)
             original_loss_list.append(loss.detach())
 
         original_loss = torch.cat(original_loss_list, dim=0)
 
         # ---------- 2) Apply a small perturbation to the parameters and compute the perturbed loss ----------
         model.eval()
+        print("Computing perturbed loss for SAAL...")
         for idx in tqdm(range(num_batch), desc="Computing perturbed loss"):
             start_idx = idx * args.pool_batch_size
             end_idx = min((idx + 1) * args.pool_batch_size, data_size)
@@ -155,7 +217,8 @@ class SAAL(ALMethod):
                 else:
                     logits, _ = self.models['backbone'](batch)
                 
-                loss1 = criterion(logits, pseudo_target)
+                # Compute loss for gradient calculation
+                loss1 = self.compute_loss(logits, pseudo_target)
                 loss1.mean().backward()
 
             # (c) Perturb the parameters based on the gradients
@@ -166,7 +229,12 @@ class SAAL(ALMethod):
                         grad_norm += p.grad.norm(p=2).item() ** 2
                 grad_norm = grad_norm ** 0.5
 
-                scale = args.rho / (grad_norm + 1e-12)
+                # Adjust rho for multi-label tasks if needed
+                rho = args.rho
+                if self.is_multilabel and hasattr(args, 'saal_multilabel_rho_scale'):
+                    rho = rho * args.saal_multilabel_rho_scale
+
+                scale = rho / (grad_norm + 1e-12)
 
                 idx_param = 0
                 for p in model.parameters():
@@ -180,11 +248,12 @@ class SAAL(ALMethod):
                 if self.args.textset:
                     outputs = self.models['backbone'](input_ids=batch['input_ids'],
                                                       attention_mask=batch['attention_mask'])
-                    logists_updated = outputs.logits
+                    logits_updated = outputs.logits
                 else:
-                    logists_updated, _ = self.models['backbone'](batch)
+                    logits_updated, _ = self.models['backbone'](batch)
                 
-                loss2 = criterion(logists_updated, pseudo_target)
+                # Compute loss after perturbation
+                loss2 = self.compute_loss(logits_updated, pseudo_target)
             max_perturbed_loss_list.append(loss2.detach())
 
             # (e) Restore the original model parameters
@@ -197,16 +266,25 @@ class SAAL(ALMethod):
 
         max_perturbed_loss = torch.cat(max_perturbed_loss_list, dim=0)
 
+        # Return scores based on acquisition mode
         if args.acqMode == 'Max' or args.acqMode == 'Max_Diversity':
-            return max_perturbed_loss
+            scores = max_perturbed_loss
         elif args.acqMode == 'Diff' or args.acqMode == 'Diff_Diversity':
-            return max_perturbed_loss - original_loss
+            scores = max_perturbed_loss - original_loss
         else:
             raise ValueError(f"Unknown acquisition mode: {args.acqMode}")
+
+        print(f"SAAL sharpness computation completed:")
+        print(f"  Original loss range: [{original_loss.min().item():.4f}, {original_loss.max().item():.4f}]")
+        print(f"  Perturbed loss range: [{max_perturbed_loss.min().item():.4f}, {max_perturbed_loss.max().item():.4f}]")
+        print(f"  Score range: [{scores.min().item():.4f}, {scores.max().item():.4f}]")
+
+        return scores
 
     def init_centers(self, X, K):
         """
         Simplified k-center initialization for selecting representative samples when 'Diversity' is specified.
+        This method works identically for both single-label and multi-label tasks.
         """
         # Expand dimensions of X to shape (N, 1)
         X_array = np.expand_dims(X, 1)
@@ -218,7 +296,7 @@ class SAAL(ALMethod):
         cent = 0
         D2 = None
 
-        pbar = tqdm(total=K, desc="K-center init")
+        pbar = tqdm(total=K, desc="K-center init for SAAL")
         pbar.update(1)  # One center has already been initialized
 
         while len(mu) < K:
@@ -231,12 +309,31 @@ class SAAL(ALMethod):
                         centInds[i] = cent
                         D2[i] = newD[i]
 
-            # Instead of breaking into debugger, consider raising an error or logging
+            # Handle the case where all distances are zero
             if sum(D2) == 0.0:
-                pdb.set_trace()
+                print("Warning: All distances are zero in k-center initialization")
+                # Add small random noise to break ties
+                D2 += np.random.rand(len(D2)) * 1e-8
+                if sum(D2) == 0.0:  # Still zero, just select randomly
+                    remaining_indices = [i for i in range(len(X)) if i not in indsAll]
+                    if remaining_indices:
+                        ind = np.random.choice(remaining_indices)
+                        mu.append(X_array[ind])
+                        indsAll.append(ind)
+                        cent += 1
+                        pbar.update(1)
+                        continue
+                    else:
+                        break  # No more samples to select
 
             D2 = D2.ravel().astype(float)
             Ddist = (D2 ** 2) / sum(D2 ** 2)
+            
+            # Handle potential numerical issues
+            if np.any(np.isnan(Ddist)) or np.any(np.isinf(Ddist)):
+                print("Warning: NaN or Inf detected in distance distribution, using uniform distribution")
+                Ddist = np.ones(len(D2)) / len(D2)
+            
             customDist = stats.rv_discrete(name='custm', values=(np.arange(len(D2)), Ddist))
             ind = customDist.rvs(size=1)[0]
             mu.append(X_array[ind])
@@ -245,10 +342,29 @@ class SAAL(ALMethod):
             pbar.update(1)
 
         pbar.close()
-
-        # The following computation of the Gram matrix and eigenvalues is not used.
-        # gram = np.matmul(X_array[indsAll], X_array[indsAll].T)  # Shape: (K, K)
-        # val, _ = np.linalg.eig(gram)
-        # val = np.abs(val)
         
+        print(f"K-center initialization completed: selected {len(indsAll)} centers")
         return np.array(indsAll)
+
+    def analyze_pseudo_labels(self, pool_pseudo_target_dropout):
+        """
+        Optional method to analyze the quality of generated pseudo-labels.
+        """
+        if self.is_multilabel:
+            # Analyze multi-label pseudo-labels
+            avg_labels_per_sample = pool_pseudo_target_dropout.sum(dim=1).mean().item()
+            label_frequencies = pool_pseudo_target_dropout.sum(dim=0)
+            
+            print(f"SAAL pseudo-label analysis (multi-label):")
+            print(f"  Average labels per sample: {avg_labels_per_sample:.2f}")
+            print(f"  Label frequencies: {label_frequencies.cpu().numpy()}")
+            print(f"  Most frequent label: {label_frequencies.argmax().item()}")
+            print(f"  Least frequent label: {label_frequencies.argmin().item()}")
+        else:
+            # Analyze single-label pseudo-labels
+            class_counts = torch.bincount(pool_pseudo_target_dropout, minlength=self.args.n_class)
+            
+            print(f"SAAL pseudo-label analysis (single-label):")
+            print(f"  Class distribution: {class_counts.cpu().numpy()}")
+            print(f"  Most frequent class: {class_counts.argmax().item()}")
+            print(f"  Least frequent class: {class_counts.argmin().item()}")

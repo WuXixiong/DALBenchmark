@@ -11,7 +11,8 @@ import torch.nn.functional as F
 class coremse(ALMethod):
     def __init__(self, args, models, unlabeled_dst, U_index, **kwargs):
         super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
-		# subset settings
+        self.is_multilabel = getattr(args, 'is_multilabel', False)
+        # subset settings
         subset_idx = np.random.choice(len(self.U_index), size=(min(self.args.subset, len(self.U_index)),), replace=False)
         self.U_index_sub = np.array(self.U_index)[subset_idx]
 
@@ -90,6 +91,7 @@ class coremse(ALMethod):
                                                             1, 1, 1, 1) # 131: pr_Yhat_E_X_Xp_Y_Yh = pr_Yhat_1_X_Xp_Y_Yh.repeat(pr_YhThetaXp_Xp_E_Yh.shape[1],1,1,1,1)
                 pr_Yhat_chunk_trans = pr_Yhat_chunk_rep.transpose(0, 3).transpose(0, 1) # 132: pr_Yhat_X_Y_Xp_E_Yh = pr_Yhat_E_X_Xp_Y_Yh.transpose(0,3).transpose(0,1)
 
+                # Core MSE computation: this is the key part that works identically for single-label and multi-label
                 core_mse_chunk = (pr_YhThetaXp_chunk_rep - pr_Yhat_chunk_trans).pow(2) # 134: core_mse = (pr_YhThetaXp_X_Y_Xp_E_Yh - pr_Yhat_X_Y_Xp_E_Yh).pow(2)
                 core_mse_X_Y_XP_chunk = torch.sum(core_mse_chunk.sum(dim=-1), dim=-1) # 135: core_mse_X_Y_Xp = torch.sum(core_mse.sum(dim=-1), dim=-1)
                 core_mse_X_Xp_Y_chunk = torch.transpose(core_mse_X_Y_XP_chunk, 1, 2) # 136: core_mse_X_Xp_Y = core_mse_X_Y_Xp.transpose(1,2)
@@ -148,6 +150,8 @@ class coremse(ALMethod):
         """
         Set model to train() to activate dropout, perform n_drop forward passes,
         and return a probability tensor of shape (n_drop, dataset_size, num_classes).
+        
+        Modified to support both single-label and multi-label tasks.
         """
         model = self.models['backbone'].to(self.args.device)
         model.train()  # VERY IMPORTANT: This activates dropout
@@ -155,7 +159,7 @@ class coremse(ALMethod):
         n_classes = len(self.args.target_list)
         probs = torch.zeros([n_drop, len(to_predict_dataset), n_classes], device=self.args.device)
 
-        print('Processing Monte Carlo dropout...')
+        print(f'Processing Monte Carlo dropout for CoreMSE ({"multi-label" if self.is_multilabel else "single-label"})...')
         # Re-sample n_drop times
         for i in tqdm(range(n_drop)):
             evaluated_instances = 0
@@ -165,13 +169,30 @@ class coremse(ALMethod):
                         input_ids = batch_data['input_ids'].to(self.args.device)
                         attention_mask = batch_data['attention_mask'].to(self.args.device)
                         logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
-                        pred_probs = torch.softmax(logits, dim=-1)
                         batch_size = input_ids.size(0)
                     else:
                         inputs = batch_data[0].to(self.args.device)
                         logits, _ = model(inputs)
-                        pred_probs = torch.softmax(logits, dim=1)
                         batch_size = inputs.size(0)
+
+                    # Convert logits to probabilities based on task type
+                    if self.is_multilabel:
+                        # For multi-label: use independent sigmoid probabilities
+                        pred_probs = torch.sigmoid(logits)
+                        
+                        # For MSE-based methods, we need valid probability distributions
+                        # Normalize to ensure probabilities sum to 1 for each sample
+                        if getattr(self.args, 'coremse_normalize_multilabel', True):
+                            # Method 1: Normalize sigmoid outputs to sum to 1
+                            pred_probs = pred_probs / (pred_probs.sum(dim=-1, keepdim=True) + 1e-10)
+                            
+                        # Alternative: keep independent probabilities (may exceed 1 when summed)
+                        # This preserves the independence assumption but may affect MSE computation
+                        # pred_probs = torch.sigmoid(logits)  # Already computed above
+                        
+                    else:
+                        # For single-label: use standard softmax
+                        pred_probs = torch.softmax(logits, dim=-1)
 
                     # Accumulate and store probabilities
                     start_slice = evaluated_instances
@@ -179,9 +200,22 @@ class coremse(ALMethod):
                     probs[i, start_slice:end_slice, :] = pred_probs
                     evaluated_instances = end_slice
 
+        print(f'CoreMSE probability computation completed:')
+        print(f'  Task type: {"Multi-label" if self.is_multilabel else "Single-label"}')
+        print(f'  Probability tensor shape: {probs.shape}')
+        print(f'  Sample probability range: [{probs.min().item():.4f}, {probs.max().item():.4f}]')
+        if self.is_multilabel:
+            avg_sum = probs.sum(dim=-1).mean().item()
+            print(f'  Average probability sum per sample: {avg_sum:.4f}')
+            if getattr(self.args, 'coremse_normalize_multilabel', True):
+                print(f'  Probabilities normalized to sum to 1.0')
+            else:
+                print(f'  Using independent sigmoid probabilities (may sum > 1.0)')
+
         return probs
 
 def random_generator_for_x_prime(x_dim, size):
+    """Generate random indices for x' selection."""
     num_to_sample = max(round(x_dim * size), 1)
     sample_indices = random.sample(range(0, x_dim), num_to_sample)
     return sorted(sample_indices)
@@ -189,6 +223,7 @@ def random_generator_for_x_prime(x_dim, size):
 def clustering(rr_X_Xp, probs_B_K_C, T, batch_size):
     """
     Perform top-k selection on rr_X_Xp followed by k-means clustering.
+    This function works identically for both single-label and multi-label tasks.
     """
     # First, sum rr_X_Xp along the last dimension, essentially scoring the data.
     rr_X = torch.sum(rr_X_Xp, dim=-1)
@@ -230,6 +265,7 @@ def kmeans(rr, k):
     # If the actual number of valid vectors is smaller than k, dynamically reduce k.
     if len(rr_unique) < k:
         k = len(rr_unique)
+        print(f"Warning: Reducing k from {k} to {len(rr_unique)} due to insufficient unique samples in CoreMSE")
     
     # 2) Perform k-means clustering using the unique vectors to avoid warnings from scikit-learn.
     kmeans_model = KMeans(n_clusters=k, random_state=0).fit(rr_unique)
@@ -248,9 +284,12 @@ def kmeans(rr, k):
     # If there are still missing elements, randomly select some from the "remaining unselected points"
     # to ensure the final number of returned indices is k.
     if m > 0:
-        print(f"Warning: {m} centroids are missing due to duplicate data. Randomly selecting from the remaining points.")
+        print(f"Warning: {m} centroids are missing due to duplicate data in CoreMSE. Randomly selecting from the remaining points.")
         pool = np.delete(np.arange(len(rr)), centroids_set)
-        p = np.random.choice(len(pool), m, replace=False)
-        centroids = np.concatenate((centroids, pool[p]), axis=None)
+        if len(pool) > 0:
+            p = np.random.choice(len(pool), min(m, len(pool)), replace=False)
+            centroids = np.concatenate((centroids, pool[p]), axis=None)
+        else:
+            print(f"Warning: No remaining points available for random selection in CoreMSE")
 
     return centroids
