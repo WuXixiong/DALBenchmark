@@ -1,5 +1,5 @@
 """
-Training functionality for TIDAL (Training Image Distribution Aware Learning) method.
+Training functionality for TIDAL method.
 """
 import torch
 import torch.nn as nn

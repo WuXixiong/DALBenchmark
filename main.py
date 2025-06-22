@@ -20,6 +20,106 @@ import methods as methods
 from collections import Counter
 from logger import initialize_log, log_cycle_info, save_logs
 
+def get_query_class_info(args, train_dst, Q_index):
+    """
+    Extract class information from query indices, supporting both single-label and multi-label.
+    
+    Args:
+        args: Arguments containing dataset configuration
+        train_dst: Training dataset
+        Q_index: Query indices
+        
+    Returns:
+        class_counts: Counter object with class distribution
+    """
+    is_multilabel = getattr(args, 'is_multilabel', False)
+    
+    if args.textset:
+        if is_multilabel:
+            # Multi-label: labels is a tensor/array with multiple labels
+            Q_classes = []
+            for idx in Q_index:
+                labels = train_dst[idx]['labels']
+                if isinstance(labels, torch.Tensor):
+                    # If it's a multi-hot vector, get indices of positive labels
+                    if len(labels.shape) > 0 and labels.shape[0] > 1:
+                        active_labels = torch.nonzero(labels, as_tuple=True)[0].tolist()
+                        Q_classes.extend(active_labels)
+                    else:
+                        # Single label in tensor format
+                        Q_classes.append(labels.item())
+                elif isinstance(labels, (list, np.ndarray)):
+                    # If it's a list of active label indices
+                    Q_classes.extend(labels)
+                else:
+                    # Single label
+                    Q_classes.append(labels)
+        else:
+            # Single-label: labels is a single value
+            Q_classes = [train_dst[idx]['labels'].item() if isinstance(train_dst[idx]['labels'], torch.Tensor) 
+                        else train_dst[idx]['labels'] for idx in Q_index]
+    else:
+        # Image dataset
+        if is_multilabel:
+            Q_classes = []
+            for idx in Q_index:
+                labels = train_dst[idx][1]
+                if isinstance(labels, torch.Tensor):
+                    if len(labels.shape) > 0 and labels.shape[0] > 1:
+                        active_labels = torch.nonzero(labels, as_tuple=True)[0].tolist()
+                        Q_classes.extend(active_labels)
+                    else:
+                        Q_classes.append(labels.item())
+                elif isinstance(labels, (list, np.ndarray)):
+                    Q_classes.extend(labels)
+                else:
+                    Q_classes.append(labels)
+        else:
+            Q_classes = [train_dst[idx][1] for idx in Q_index]
+    
+    class_counts = Counter(Q_classes)
+    return class_counts
+
+def setup_criterion(args):
+    """
+    Setup appropriate loss functions based on task type.
+    
+    Args:
+        args: Arguments containing dataset configuration
+        
+    Returns:
+        Dictionary containing different loss functions
+    """
+    is_multilabel = getattr(args, 'is_multilabel', False)
+    
+    # Main criterion for training
+    if is_multilabel:
+        criterion = torch.nn.BCEWithLogitsLoss()
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
+    
+    # Additional criterions for specific methods
+    criterion_xent = torch.nn.CrossEntropyLoss()  # Always cross-entropy for some methods
+    
+    # Center loss configuration
+    if args.textset:  # text dataset
+        feat_dim = 768  # BERT feature dimension
+    else:  # image dataset
+        feat_dim = 512  # Typical image feature dimension
+        
+    criterion_cent = CenterLoss(
+        num_classes=args.num_IN_class + 1, 
+        feat_dim=feat_dim, 
+        use_gpu=True
+    )
+    
+    if args.textset:
+        optimizer_centloss = torch.optim.AdamW(criterion_cent.parameters(), lr=0.005)
+    else:
+        optimizer_centloss = torch.optim.SGD(criterion_cent.parameters(), lr=args.lr_cent)
+    
+    return criterion, criterion_xent, criterion_cent, optimizer_centloss
+
 # Main
 if __name__ == '__main__':
     # Training settings
@@ -40,6 +140,9 @@ if __name__ == '__main__':
         torch.backends.cudnn.deterministic = True
 
         train_dst, unlabeled_dst, test_dst = get_dataset(args, trial)
+        if args.method == 'TIDAL':
+            train_dst.init_tidal_params(len(args.target_list))
+            unlabeled_dst.init_tidal_params(len(args.target_list))
 
         # Initialize a labeled dataset by randomly sampling K=1,000 points from the entire dataset.
         I_index, O_index, U_index, Q_index = [], [], [], []
@@ -82,17 +185,13 @@ if __name__ == '__main__':
             print("| Training on model %s" % args.model)
             models = get_models(args, nets, args.model, models)
             torch.backends.cudnn.benchmark = False
-            # Loss, criterion and scheduler (re)initialization
+            
+            # Loss, criterion and scheduler (re)initialization - Modified for multi-label support
             criterion, optimizers, schedulers = get_optim_configurations(args, models)
+            
+            # Setup additional criterions with multi-label support
+            criterion, criterion_xent, criterion_cent, optimizer_centloss = setup_criterion(args)
 
-            # for LFOSA and EOAL...
-            criterion_xent = torch.nn.CrossEntropyLoss()
-            if args.textset: # text dataset
-                criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=768, use_gpu=True) # feat_dim = first dim of
-                optimizer_centloss = torch.optim.AdamW(criterion_cent.parameters(), lr=0.005)
-            else: # for images
-                criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=512, use_gpu=True) # feat_dim = first dim of feature (output,feature from model return)
-                optimizer_centloss = torch.optim.SGD(criterion_cent.parameters(), lr=args.lr_cent)
             # PAL wnet
             ood_num = (args.num_IN_class+1)*2
             wnet, optimizer_wnet = set_Wnet(args, ood_num)
@@ -132,12 +231,14 @@ if __name__ == '__main__':
             ALmethod = methods.__dict__[args.method](args, models, unlabeled_dst, U_index, **selection_args)
             Q_index, Q_scores = ALmethod.select()
 
-            # get query data class
-            if args.textset:
-                Q_classes = [train_dst[idx]['labels'].item() for idx in Q_index]
+            # get query data class - Modified for multi-label support
+            class_counts = get_query_class_info(args, train_dst, Q_index)
+            
+            # Print class distribution
+            if getattr(args, 'is_multilabel', False):
+                print(f"Query label distribution (multi-label): {dict(class_counts)}")
             else:
-                Q_classes = [train_dst[idx][1] for idx in Q_index]
-            class_counts = Counter(Q_classes)
+                print(f"Query class distribution: {dict(class_counts)}")
 
             # Update Indices
             I_index, O_index, U_index, in_cnt = get_sub_train_dataset(args, train_dst, I_index, O_index, U_index, Q_index, initial=False)

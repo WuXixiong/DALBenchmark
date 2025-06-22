@@ -1,4 +1,6 @@
 import random
+import torch
+import numpy as np
 from torch.utils.data.dataset import Subset
 
 def get_subclass_dataset(dataset, classes):
@@ -23,6 +25,41 @@ def get_subclass_dataset(dataset, classes):
     dataset = Subset(dataset, indices)
     return dataset
 
+def is_in_distribution_sample(labels, num_classes, is_multilabel=False):
+    """
+    Check if a sample is in-distribution based on its labels.
+    
+    Args:
+        labels: Label(s) for the sample
+        num_classes: Number of in-distribution classes
+        is_multilabel: Whether this is a multi-label task
+        
+    Returns:
+        True if sample is in-distribution, False otherwise
+    """
+    if is_multilabel:
+        # For multi-label: check if sample has any valid labels
+        if isinstance(labels, (torch.Tensor, np.ndarray)):
+            # If labels is a multi-hot vector, check if any positive labels are within range
+            if len(labels.shape) > 0 and labels.shape[0] == num_classes:
+                return torch.any(labels > 0) if isinstance(labels, torch.Tensor) else np.any(labels > 0)
+            else:
+                # If labels is a list of active label indices
+                if isinstance(labels, torch.Tensor):
+                    labels = labels.cpu().numpy() if labels.is_cuda else labels.numpy()
+                return any(label < num_classes for label in labels)
+        elif isinstance(labels, list):
+            # If labels is a list of active label indices
+            return any(label < num_classes for label in labels)
+        else:
+            # Single label case treated as list
+            return labels < num_classes
+    else:
+        # For single-label: simple comparison
+        if isinstance(labels, (torch.Tensor, np.ndarray)):
+            labels = labels.item() if hasattr(labels, 'item') else labels
+        return labels < num_classes
+
 def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index=None, initial=False):
     """
     Get subsets of the training dataset for active learning.
@@ -43,17 +80,34 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index=None
     classes = args.target_list
     budget = args.n_initial
     ood_rate = args.ood_rate
+    is_multilabel = getattr(args, 'is_multilabel', False)
 
     if initial:
         if args.openset:
             # Handle text datasets differently
             if args.textset:
-                L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
-                O_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] >= len(classes)]
+                L_total = []
+                O_total = []
+                for i in range(len(dataset)):
+                    sample_labels = dataset[i]['labels']
+                    sample_index = dataset[i]['index']
+                    
+                    if is_in_distribution_sample(sample_labels, len(classes), is_multilabel):
+                        L_total.append(sample_index)
+                    else:
+                        O_total.append(sample_index)
             else:
                 # Handle image datasets
-                L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
-                O_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] >= len(classes)]
+                L_total = []
+                O_total = []
+                for i in range(len(dataset)):
+                    sample_labels = dataset[i][1]
+                    sample_index = dataset[i][2]
+                    
+                    if is_in_distribution_sample(sample_labels, len(classes), is_multilabel):
+                        L_total.append(sample_index)
+                    else:
+                        O_total.append(sample_index)
 
             # Calculate number of OOD samples based on ood_rate
             n_ood = round(ood_rate * (len(L_total) + len(O_total)))
@@ -109,9 +163,21 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index=None
             
             # Handle text datasets differently
             if args.textset:
-                L_total = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
+                L_total = []
+                for i in range(len(dataset)):
+                    sample_labels = dataset[i]['labels']
+                    sample_index = dataset[i]['index']
+                    
+                    if is_in_distribution_sample(sample_labels, len(classes), is_multilabel):
+                        L_total.append(sample_index)
             else:
-                L_total = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
+                L_total = []
+                for i in range(len(dataset)):
+                    sample_labels = dataset[i][1]
+                    sample_index = dataset[i][2]
+                    
+                    if is_in_distribution_sample(sample_labels, len(classes), is_multilabel):
+                        L_total.append(sample_index)
             
             O_total = []
             n_ood = 0
@@ -153,8 +219,8 @@ def get_sub_train_dataset(args, dataset, L_index, O_index, U_index, Q_index=None
 
         # Separate in-distribution and OOD queries
         in_Q_index, ood_Q_index = [], []
-        for i, c in enumerate(Q_label):
-            if c < len(classes):
+        for i, sample_labels in enumerate(Q_label):
+            if is_in_distribution_sample(sample_labels, len(classes), is_multilabel):
                 in_Q_index.append(Q_index[i])
             else:
                 ood_Q_index.append(Q_index[i])
@@ -182,10 +248,23 @@ def get_sub_test_dataset(args, dataset):
         Indices of in-distribution test samples
     """
     classes = args.target_list
+    is_multilabel = getattr(args, 'is_multilabel', False)
 
+    labeled_index = []
     if args.textset:
-        labeled_index = [dataset[i]['index'] for i in range(len(dataset)) if dataset[i]['labels'] < len(classes)]
-    else: # for image datasets
-        labeled_index = [dataset[i][2] for i in range(len(dataset)) if dataset[i][1] < len(classes)]
+        for i in range(len(dataset)):
+            sample_labels = dataset[i]['labels']
+            sample_index = dataset[i]['index']
+            
+            if is_in_distribution_sample(sample_labels, len(classes), is_multilabel):
+                labeled_index.append(sample_index)
+    else: 
+        # for image datasets
+        for i in range(len(dataset)):
+            sample_labels = dataset[i][1]
+            sample_index = dataset[i][2]
+            
+            if is_in_distribution_sample(sample_labels, len(classes), is_multilabel):
+                labeled_index.append(sample_index)
         
     return labeled_index

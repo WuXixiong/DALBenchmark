@@ -97,6 +97,30 @@ parser.add_argument('--print_freq', '-p', default=300, type=int, help='print fre
 parser.add_argument('--seed', default=0, type=int, help="random seed")
 parser.add_argument('-j', '--workers', default=5, type=int, help='number of data loading workers (default: 4)')
 parser.add_argument("--no-ssl-save", action="store_false", dest="ssl_save", help="disable saving ssl model (saves by default)")
+parser.add_argument('--is_multilabel', action='store_true', help='multi-label classification task')
+# === Balanced Subset Selection Parameters ===
+parser.add_argument('--samples-per-class', type=int, default=None,
+                   help='Number of samples to select per class for balanced subset. '
+                        'If None, use the full dataset. Example: 1000 for DBpedia means '
+                        '1000 samples per class (14000 total for 14 classes)')
+parser.add_argument('--apply-subset-to-test', action='store_true', default=False,
+                   help='Whether to also apply balanced subset selection to test set. '
+                        'Default: False (only apply to training set)')
+parser.add_argument('--subset-random-seed', type=int, default=42,
+                   help='Random seed for balanced subset selection. '
+                        'Ensures reproducible subset selection across runs')
+# === Optional: Subset Configuration Presets ===
+parser.add_argument('--subset-preset', type=str, default=None,
+                   choices=['small', 'medium', 'large', 'custom'],
+                   help='Predefined subset sizes: '
+                        'small (100-500 per class), '
+                        'medium (500-2000 per class), '
+                        'large (2000+ per class), '
+                        'custom (use --samples-per-class value)')
+# === Enhanced Reporting ===
+parser.add_argument('--verbose-subset', action='store_true', default=False,
+                   help='Enable verbose output for subset selection process, '
+                        'including detailed class distribution statistics')
 
 # Optimizer and scheduler
 parser.add_argument('--optimizer', default="SGD", help='optimizer to use, e.g. SGD, Adam')

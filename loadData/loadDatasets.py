@@ -1,5 +1,7 @@
 import numpy as np
 import random
+import os
+import torch
 from datasets import load_dataset
 from transformers import DistilBertTokenizer, RobertaTokenizer
 
@@ -14,9 +16,12 @@ from ownDatasets.imdb import MyIMDBDataset
 from ownDatasets.sst5 import MySST5Dataset
 from ownDatasets.dbpedia import MyDbpediaDataset
 from ownDatasets.yelp import MyYelpDataset
+from ownDatasets.trec6 import MyTREC6Dataset
+from ownDatasets.rcv1 import MyRCV1Dataset
 
 # Import transforms
 from .dataTransform import get_dataset_transforms
+from .dataUtils import get_balanced_subset_indices, apply_balanced_subset
 
 def get_dataset(args, trial):
     """
@@ -92,10 +97,85 @@ def get_dataset(args, trial):
             train_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             test_set = MyAGNewsDataset(agnews_dataset['test'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             unlabeled_set = MyAGNewsDataset(agnews_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+        elif args.dataset == 'TREC6':
+            trec6_dataset = load_dataset("trec", trust_remote_code=True)
+            train_set = MyTREC6Dataset(trec6_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+            test_set = MyTREC6Dataset(trec6_dataset['test'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+            unlabeled_set = MyTREC6Dataset(trec6_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
+        elif args.dataset == 'RCV1':
+            # RCV1 dataset paths 
+            data_dir = getattr(args, 'data_dir', '/home/cwu1/sv12/chenkaiwu/DALBenchmark/data/rcv1/')
+            train_file = os.path.join(data_dir, 'rcv1_train_meanir_10.json')
+            test_file = os.path.join(data_dir, 'rcv1_test_meanir_10.json')
+            
+            # RCV1 parameters
+            max_length = getattr(args, 'max_length', 512)  # RCV1文档通常较长
+            use_keywords = getattr(args, 'use_keywords', False)  # 是否使用关键词
+            
+            # Create training dataset
+            train_set = MyRCV1Dataset(
+                data_files=train_file, 
+                tokenizer=tokenizer, 
+                imbalance_factor=args.imb_factor,
+                max_length=max_length,
+                use_keywords=use_keywords
+            )
+            
+            # Create test dataset  
+            test_set = MyRCV1Dataset(
+                data_files=test_file, 
+                tokenizer=tokenizer, 
+                imbalance_factor=args.imb_factor, 
+                max_length=max_length,
+                use_keywords=use_keywords
+            )
+            
+            test_set.mlb = train_set.mlb
+            test_set.classes = train_set.classes  
+            test_set.num_classes = train_set.num_classes
+            test_set.encoded_labels = test_set.mlb.transform(test_set.labels)
+            test_set.targets = torch.tensor(test_set.encoded_labels, dtype=torch.float)
+            
+            unlabeled_set = MyRCV1Dataset(
+                data_files=train_file, 
+                tokenizer=tokenizer, 
+                imbalance_factor=args.imb_factor,
+                max_length=max_length,
+                use_keywords=use_keywords
+            )
         else:
             raise ValueError(f"Text dataset '{args.dataset}' is not supported. Please choose from the available text datasets.")
     else:
         raise ValueError(f"Dataset '{args.dataset}' is not supported. Please choose from the available datasets.")
+
+    # Apply balanced subset selection if specified
+    if hasattr(args, 'samples_per_class') and args.samples_per_class is not None:
+        print(f"\n=== Applying Balanced Subset Selection ===")
+        print(f"Target samples per class: {args.samples_per_class}")
+        
+        # Apply to training set
+        print(f"\nProcessing training set:")
+        train_set = apply_balanced_subset(train_set, args.samples_per_class, 
+                                        getattr(args, 'subset_random_seed', 42))
+        
+        # Apply to test set if specified
+        if hasattr(args, 'apply_subset_to_test') and args.apply_subset_to_test:
+            print(f"\nProcessing test set:")
+            test_set = apply_balanced_subset(test_set, int(args.samples_per_class / 10), 
+                                           getattr(args, 'subset_random_seed', 42) + 1)
+        
+        # Update unlabeled set to match training set
+        if hasattr(train_set, 'data'):
+            unlabeled_set.data = train_set.data.copy() if hasattr(train_set.data, 'copy') else train_set.data[:]
+        elif hasattr(train_set, 'texts'):
+            unlabeled_set.texts = train_set.texts.copy()
+            unlabeled_set.labels = train_set.labels.copy()
+        elif hasattr(train_set, 'examples'):
+            unlabeled_set.examples = train_set.examples.copy()
+        
+        unlabeled_set.targets = train_set.targets.copy() if hasattr(train_set.targets, 'copy') else train_set.targets[:]
+        
+        print(f"=== Balanced Subset Selection Complete ===\n")
 
     # Configure dataset settings based on type
     _configure_dataset_settings(args, trial)
@@ -156,7 +236,28 @@ def _configure_dataset_settings(args, trial):
         args.n_class = 5  # Total number of classes in SST5
         args.target_list = list(range(5))  # All classes (for closed set)
         args.num_IN_class = 5  # Number of in-distribution classes
-        
+
+    elif args.dataset == 'RCV1':
+        args.input_size = 512  # RCV1 documents are usually long, so a larger input size is needed
+
+        # The number of classes in RCV1 should be determined based on the actual data
+        # Here we set a placeholder value
+        if not hasattr(args, 'n_class'):
+            # If the dataset has not been loaded yet, set a default value
+            # The actual value will be updated after creating the dataset
+            args.n_class = 103  # Common number of topic classes in RCV1; adjust based on your data
+
+        # For multi-label classification, target_list includes all possible labels
+        args.target_list = list(range(args.n_class))  # All possible labels
+        args.num_IN_class = args.n_class  # For multi-label tasks, all classes are in-distribution
+
+        # RCV1-specific configurations
+        args.is_multilabel = True  # Indicate this is a multi-label task
+        args.loss_type = 'bce'  # BCE loss is commonly used for multi-label classification
+
+        # If class imbalance needs to be addressed, set class balancing parameters
+        args.class_balanced = getattr(args, 'class_balanced', False)
+
         if args.openset:
             # Define different class combinations for trials
             args.target_lists = [
@@ -179,6 +280,29 @@ def _configure_dataset_settings(args, trial):
         args.n_class = 5  # Total number of classes in SST5
         args.target_list = list(range(5))  # All classes (for closed set)
         args.num_IN_class = 5  # Number of in-distribution classes
+        
+        if args.openset:
+            # Define different class combinations for trials
+            args.target_lists = [
+                [0, 2], [0, 3], [0, 4], [0, 5],
+                [1, 2], [1, 3], [1, 4],
+                [2, 3], [2, 4],
+                [3, 4]
+            ]
+            if trial >= len(args.target_lists):
+                print(f"Warning: Trial {trial} exceeds available target lists. Using trial % len(target_lists).")
+            args.target_list = args.target_lists[trial % len(args.target_lists)]
+            args.num_IN_class = len(args.target_list)  # Update number of in-distribution classes
+        
+        # Calculate untarget_list (classes that will be treated as OOD)
+        args.untarget_list = list(np.setdiff1d(list(range(args.n_class)), list(args.target_list)))
+
+    elif args.dataset == 'TREC6':
+        args.input_size = 128
+        # Set total number of classes (including OOD)
+        args.n_class = 6  # Total number of classes in TREC6
+        args.target_list = list(range(6))  # All classes (for closed set)
+        args.num_IN_class = 6  # Number of in-distribution classes
         
         if args.openset:
             # Define different class combinations for trials
@@ -354,6 +478,10 @@ def _report_split_statistics(args, unlabeled_set, test_set):
     """
     # Split Check and Reporting
     print("Target classes: ", args.target_list)
+    
+    # Add subset selection info if applied
+    if hasattr(args, 'samples_per_class') and args.samples_per_class is not None:
+        print(f"Balanced subset applied: {args.samples_per_class} samples per class")
 
     if args.method == 'EPIG':
         uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
@@ -364,6 +492,7 @@ def _report_split_statistics(args, unlabeled_set, test_set):
         uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
         print("Train, # samples per class")
         print(uni, cnt)
+    
     uni, cnt = np.unique(np.array(test_set.targets), return_counts=True)
     print("Test, # samples per class")
     print(uni, cnt)

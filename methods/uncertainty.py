@@ -16,6 +16,9 @@ class Uncertainty(ALMethod):
             raise NotImplementedError(f"Selection algorithm '{selection_method}' unavailable.")
         
         self.selection_method = selection_method
+        
+        # Check if this is a multi-label task
+        self.is_multilabel = getattr(args, 'is_multilabel', False)
 
     def run(self):
         """
@@ -64,44 +67,76 @@ class Uncertainty(ALMethod):
                         inputs = data[0].to(self.args.device)
                         logits, _ = model(inputs)
 
+                    # Convert logits to probabilities based on task type
+                    if self.is_multilabel:
+                        # For multi-label: use sigmoid to get independent probabilities for each class
+                        probs = torch.sigmoid(logits)
+                    else:
+                        # For single-label: use softmax
+                        probs = torch.softmax(logits, dim=1)
+
                     if self.selection_method == "CONF":
-                        # Lower confidence means higher uncertainty → Take the maximum confidence value, 
-                        # then we use its "inverse."
-                        # Maximum confidence = max probability
-                        confs = torch.max(torch.softmax(logits, dim=1), dim=1).values
+                        if self.is_multilabel:
+                            # For multi-label: confidence is based on how close probabilities are to 0 or 1
+                            # Distance from 0.5 (most uncertain point) for each class
+                            class_confidences = torch.abs(probs - 0.5) * 2  # Scale to [0, 1]
+                            # Take mean confidence across all classes
+                            confs = torch.mean(class_confidences, dim=1)
+                        else:
+                            # For single-label: maximum confidence value
+                            confs = torch.max(probs, dim=1).values
+                        
                         # Since we use argsort(scores) in ascending order, 
                         # we store confidence as scores so that lower confidence gets selected first.
                         scores = np.append(scores, confs.cpu().numpy())
 
                     elif self.selection_method == "Entropy":
-                        # Compute entropy: standard formula is -\sum p*log p
-                        probs = torch.softmax(logits, dim=1).cpu().numpy()
-                        # Normal entropy = -sum(p * log(p)). The expression below lacks a negative sign → it's negative entropy.
-                        # To ensure "higher entropy → higher uncertainty," we manually add a negative sign.
-                        ent = -(probs * np.log(probs + 1e-6)).sum(axis=1)
-                        # We usually want "high entropy → high uncertainty."
+                        if self.is_multilabel:
+                            # For multi-label: compute binary entropy for each class and sum
+                            # Binary entropy: -p*log(p) - (1-p)*log(1-p)
+                            eps = 1e-6
+                            binary_entropy = -(probs * torch.log(probs + eps) + 
+                                             (1 - probs) * torch.log(1 - probs + eps))
+                            # Sum entropy across all classes
+                            ent = torch.sum(binary_entropy, dim=1)
+                        else:
+                            # For single-label: standard categorical entropy
+                            ent = -(probs * torch.log(probs + 1e-6)).sum(axis=1)
+                        
+                        # We want "high entropy → high uncertainty."
                         # To make the highest entropy appear first using np.argsort(scores), we store -ent.
-                        # Alternatively, store ent and use np.argsort(-ent) later. Keeping it consistent with the original implementation:
-                        scores = np.append(scores, -ent)  
-                        # This way, the highest entropy results in the smallest -ent, so it is ranked first.
+                        scores = np.append(scores, -ent.cpu().numpy())
 
                     elif self.selection_method == "Margin":
-                        # margin = p(y1) - p(y2), where y1 is the highest probability class, y2 is the second highest probability class
-                        probs = torch.softmax(logits, dim=1)
-                        top1_vals, top1_idxs = probs.max(dim=1)
-                        # Temporarily set top1 positions to -1 so that the next max operation gets the second highest
-                        tmp_probs = probs.clone()
-                        tmp_probs[range(len(top1_idxs)), top1_idxs] = -1.0
-                        top2_vals, _ = tmp_probs.max(dim=1)
-                        margins = (top1_vals - top2_vals).cpu().numpy()
+                        if self.is_multilabel:
+                            # For multi-label: use minimum margin across all classes
+                            # Margin for each class: |p - 0.5| (distance from decision boundary)
+                            class_margins = torch.abs(probs - 0.5)
+                            # Take minimum margin (most uncertain class determines overall uncertainty)
+                            margins = torch.min(class_margins, dim=1).values
+                        else:
+                            # For single-label: difference between top two classes
+                            top1_vals, top1_idxs = probs.max(dim=1)
+                            tmp_probs = probs.clone()
+                            tmp_probs[range(len(top1_idxs)), top1_idxs] = -1.0
+                            top2_vals, _ = tmp_probs.max(dim=1)
+                            margins = top1_vals - top2_vals
+                        
                         # Smaller margin means higher uncertainty → We store margin so that argsort selects the smallest margins first.
-                        scores = np.append(scores, margins)
+                        scores = np.append(scores, margins.cpu().numpy())
 
                     elif self.selection_method == "VarRatio":
-                        # VarRatio is typically 1 - max_prob, where a larger value indicates higher uncertainty.
-                        probs = torch.softmax(logits, dim=1)
-                        max_probs = torch.max(probs, dim=1).values
-                        uncertainties = 1.0 - max_probs
+                        if self.is_multilabel:
+                            # For multi-label: use average variation ratio across classes
+                            # Variation ratio for each class: min(p, 1-p) / 0.5
+                            class_var_ratios = torch.min(probs, 1 - probs) / 0.5
+                            # Take mean across classes
+                            uncertainties = torch.mean(class_var_ratios, dim=1)
+                        else:
+                            # For single-label: 1 - max_prob
+                            max_probs = torch.max(probs, dim=1).values
+                            uncertainties = 1.0 - max_probs
+                        
                         # Since higher values mean higher uncertainty, store negative values to ensure they appear first in ascending order sorting.
                         scores = np.append(scores, -uncertainties.cpu().numpy())
 
@@ -133,36 +168,71 @@ class Uncertainty(ALMethod):
             elif self.selection_method == "BALD":
                 # pb = E[p(y|x, w)] (mean probability)
                 pb = probs_mc.mean(dim=0)  # shape=[N, num_classes]
-                # H(mean) = -\sum pb * log pb
-                entropy1 = -(pb * torch.log(pb + 1e-6)).sum(dim=1)
-                # E[H(p(y|x,w))] = E[ -\sum p*log p ]
-                entropy2 = -(probs_mc * torch.log(probs_mc + 1e-6)).sum(dim=2).mean(dim=0)
+                
+                if self.is_multilabel:
+                    # For multi-label: compute binary entropy for each class
+                    eps = 1e-6
+                    # H(mean) = -\sum [pb * log(pb) + (1-pb) * log(1-pb)] for each class
+                    entropy1 = -(pb * torch.log(pb + eps) + 
+                               (1 - pb) * torch.log(1 - pb + eps)).sum(dim=1)
+                    # E[H(p(y|x,w))] = E[ -\sum p*log p - (1-p)*log(1-p) ] for each class
+                    entropy2 = -(probs_mc * torch.log(probs_mc + eps) + 
+                               (1 - probs_mc) * torch.log(1 - probs_mc + eps)).sum(dim=2).mean(dim=0)
+                else:
+                    # For single-label: standard categorical entropy
+                    # H(mean) = -\sum pb * log pb
+                    entropy1 = -(pb * torch.log(pb + 1e-6)).sum(dim=1)
+                    # E[H(p(y|x,w))] = E[ -\sum p*log p ]
+                    entropy2 = -(probs_mc * torch.log(probs_mc + 1e-6)).sum(dim=2).mean(dim=0)
+                
                 # Mutual information = entropy2 - entropy1
                 uncertainties = entropy2 - entropy1
                 scores = -uncertainties.cpu().numpy()
 
             elif self.selection_method == "MarginDropout":
-                # First, average over n_drop samples -> mean probability -> top1 - top2
+                # First, average over n_drop samples -> mean probability
                 mean_probs = probs_mc.mean(dim=0)  # shape=[N, num_classes]
-                sorted_probs, _ = torch.sort(mean_probs, descending=True, dim=1)
-                # margin = p1 - p2, the smaller the margin, the higher the uncertainty
-                margin_vals = (sorted_probs[:, 0] - sorted_probs[:, 1])
-                # Since a smaller margin means higher uncertainty, we store margin directly, 
-                # so that the smallest margin samples get selected.
-                # No need to take the negative.
+                
+                if self.is_multilabel:
+                    # For multi-label: minimum margin across classes
+                    class_margins = torch.abs(mean_probs - 0.5)
+                    margin_vals = torch.min(class_margins, dim=1).values
+                else:
+                    # For single-label: top1 - top2
+                    sorted_probs, _ = torch.sort(mean_probs, descending=True, dim=1)
+                    margin_vals = sorted_probs[:, 0] - sorted_probs[:, 1]
+                
+                # Since a smaller margin means higher uncertainty, we store margin directly
                 scores = np.append(scores, margin_vals.cpu().numpy())
 
             elif self.selection_method == "CONFDropout":
-                # Take the maximum confidence from n_drop samples, then apply some aggregation (e.g., mean)
-                # Alternatively, compute mean_probs first and then take the maximum value
+                # Take the mean over MC samples first
                 mean_probs = probs_mc.mean(dim=0)  # shape=[N, num_classes]
-                max_conf = torch.max(mean_probs, dim=1).values
+                
+                if self.is_multilabel:
+                    # For multi-label: average confidence across classes
+                    class_confidences = torch.abs(mean_probs - 0.5) * 2
+                    max_conf = torch.mean(class_confidences, dim=1)
+                else:
+                    # For single-label: maximum confidence
+                    max_conf = torch.max(mean_probs, dim=1).values
+                
                 # Lower confidence means higher uncertainty, so we store confidence directly.
                 scores = np.append(scores, max_conf.cpu().numpy())
 
             elif self.selection_method == "EntropyDropout":
                 mean_probs = probs_mc.mean(dim=0)  # shape=[N, num_classes]
-                ent = -(mean_probs * torch.log(mean_probs + 1e-6)).sum(dim=1)
+                
+                if self.is_multilabel:
+                    # For multi-label: binary entropy for each class, then sum
+                    eps = 1e-6
+                    binary_entropy = -(mean_probs * torch.log(mean_probs + eps) + 
+                                     (1 - mean_probs) * torch.log(1 - mean_probs + eps))
+                    ent = torch.sum(binary_entropy, dim=1)
+                else:
+                    # For single-label: categorical entropy
+                    ent = -(mean_probs * torch.log(mean_probs + 1e-6)).sum(dim=1)
+                
                 # Higher entropy means higher uncertainty, so take the negative to ensure
                 # that higher entropy is ranked first.
                 scores = np.append(scores, -ent.cpu().numpy())
@@ -198,13 +268,17 @@ class Uncertainty(ALMethod):
                         input_ids = batch_data['input_ids'].to(self.args.device)
                         attention_mask = batch_data['attention_mask'].to(self.args.device)
                         logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
-                        pred_probs = torch.softmax(logits, dim=-1)
                         batch_size = input_ids.size(0)
                     else:
                         inputs = batch_data[0].to(self.args.device)
                         logits, _ = model(inputs)
-                        pred_probs = torch.softmax(logits, dim=1)
                         batch_size = inputs.size(0)
+
+                    # Convert logits to probabilities based on task type
+                    if self.is_multilabel:
+                        pred_probs = torch.sigmoid(logits)
+                    else:
+                        pred_probs = torch.softmax(logits, dim=-1)
 
                     # Accumulate and store probabilities
                     start_slice = evaluated_instances

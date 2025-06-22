@@ -34,7 +34,7 @@ class corelog(ALMethod):
             probs_B_K_C = self.predict_prob_dropout_split(unlabeled_subset, selection_loader, n_drop=self.args.n_drop)
 
             # 2. Split probs_B_K_C along the sample dimension into chunks
-            n_chunks = 10  # number of chunks to split the dataset into
+            n_chunks = len(self.args.target_list)  # number of chunks to split the dataset into
             chunked_probs = torch.chunk(probs_B_K_C, n_chunks, dim=1)
 
             # 2.1 Compute the global random indices (over the entire dataset)

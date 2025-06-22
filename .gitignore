@@ -1,4 +1,13 @@
 logs/*
+logs00/*
+logs01/*
+logs02/*
+logs03/
+/logs00
+/logs01
+/logs02
+/logs03
+/logs04
 !logs/
 !logs/.gitkeep
 
@@ -7,3 +16,4 @@ __pycache__/
 *.py[cod]
 
 *.log
+*.sh

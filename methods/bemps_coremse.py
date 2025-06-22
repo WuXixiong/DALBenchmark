@@ -34,7 +34,10 @@ class coremse(ALMethod):
             probs_B_K_C = self.predict_prob_dropout_split(self.unlabeled_set, selection_loader, n_drop=self.args.n_drop)
 
             # 2. Split probs_B_K_C along the sample dimension into chunks
-            n_chunks = 100  # number of chunks to split the dataset into
+            if self.args.n_query >= 200:  # If n_query is too large, split into smaller chunks
+                n_chunks = max(self.args.n_query, 500)  # Ensure at least 500 samples per chunk
+            else:
+                n_chunks = len(self.args.target_list)  # number of chunks to split the dataset into
             chunked_probs = torch.chunk(probs_B_K_C, n_chunks, dim=1)
 
             # 2.1 Compute the global random indices (over the entire dataset)

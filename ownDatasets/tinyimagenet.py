@@ -17,9 +17,7 @@ class MyTinyImageNet(Dataset):
         self.targets = np.array(hf_dataset['label'])  # This is correct
         self.transform = transform
         self.classes = hf_dataset.features['label'].names  # This is correct
-        
-        if method == 'TIDAL':
-            self.moving_prob = np.zeros((len(self.data), n_class), dtype=np.float32)
+        self.method = method
         
         if imbalance_factor:
             # Create imbalance ratios
@@ -59,6 +57,11 @@ class MyTinyImageNet(Dataset):
             return img, target, index, moving_prob
 
         return img, target, index
+
+    def init_tidal_params(self, n_class):
+        """在知道实际类别数后初始化TIDAL参数"""
+        if self.method == 'TIDAL':
+            self.moving_prob = np.zeros((len(self.data), n_class), dtype=np.float32)
 
     def __len__(self):
         """

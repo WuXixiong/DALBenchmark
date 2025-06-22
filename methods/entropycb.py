@@ -52,7 +52,9 @@ class EntropyCB(ALMethod):
             labelled_classes = [labelled_subset[i]['labels'] for i in range(len(labelled_subset))]
         else:
             labelled_classes = [labelled_subset[i][1] for i in range(len(labelled_subset))]
-        _, counts = np.unique(labelled_classes, return_counts=True)
+        # _, counts = np.unique(labelled_classes, return_counts=True)
+        labelled_classes = np.array(labelled_classes)
+        counts = np.bincount(labelled_classes, minlength=self.args.num_IN_class)
         class_threshold=int((2*self.args.n_query+(self.cur_cycle+1)*self.args.n_query)/int(self.args.num_IN_class))
         class_share=class_threshold-counts
         samples_share= np.array([0 if c<0 else c for c in class_share]).reshape(int(self.args.num_IN_class),1)

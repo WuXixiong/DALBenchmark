@@ -126,6 +126,9 @@ class ResNet_224x224(resnet.ResNet):
             self.fc = nn.Linear(self.fc.in_features, num_classes)
         self.no_grad = no_grad
 
+        # Add embDim based on final feature dimension before the fc layer
+        self.embDim = 512 * block.expansion
+
     def get_last_layer(self):
         return self.fc
 
