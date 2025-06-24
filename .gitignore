@@ -8,6 +8,7 @@ logs03/
 /logs02
 /logs03
 /logs04
+/logs05
 !logs/
 !logs/.gitkeep
 
@@ -17,3 +18,5 @@ __pycache__/
 
 *.log
 *.sh
+*.err
+*.out

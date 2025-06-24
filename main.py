@@ -18,7 +18,7 @@ from loadData import get_dataset, get_sub_train_dataset, get_sub_test_dataset
 import nets
 import methods as methods
 from collections import Counter
-from logger import initialize_log, log_cycle_info, save_logs
+from logger import initialize_log, log_cycle_info, save_logs, log_trial_timing_summary
 
 def get_query_class_info(args, train_dst, Q_index):
     """
@@ -127,9 +127,15 @@ if __name__ == '__main__':
     args = get_more_args(args)
     print("args: ", args)
 
+    # Add global time statistics
+    all_select_times = []  # Store selection times for all trials and cycles
+
     # Runs on Different Class-splits
     for trial in range(args.trial):
         print("=============================Trial: {}=============================".format(trial + 1))
+
+        # Initialize time statistics for each trial
+        trial_select_times = []  # Store selection times for the current trial
 
         # Set random seed
         random_seed = args.seed
@@ -150,14 +156,14 @@ if __name__ == '__main__':
         test_I_index = get_sub_test_dataset(args, test_dst)
 
         # DataLoaders
-        sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
+        sampler_labeled = SubsetRandomSampler(I_index)
         sampler_test = SubsetSequentialSampler(test_I_index)
         train_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
         test_loader = DataLoader(test_dst, sampler=sampler_test, batch_size=args.test_batch_size, num_workers=args.workers)
         if args.method in ['LFOSA', 'EOAL', 'PAL']:
             ood_detection_index = I_index + O_index
-            sampler_ood = SubsetRandomSampler(O_index)  # make indices initial to the samples
-            sampler_query = SubsetRandomSampler(ood_detection_index)  # make indices initial to the samples
+            sampler_ood = SubsetRandomSampler(O_index)
+            sampler_query = SubsetRandomSampler(ood_detection_index)
             query_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
             ood_dataloader = DataLoader(train_dst, sampler=sampler_ood, batch_size=args.batch_size, num_workers=args.workers)
             sampler_unlabeled = SubsetRandomSampler(U_index)
@@ -185,10 +191,10 @@ if __name__ == '__main__':
             print("| Training on model %s" % args.model)
             models = get_models(args, nets, args.model, models)
             torch.backends.cudnn.benchmark = False
-            
+
             # Loss, criterion and scheduler (re)initialization - Modified for multi-label support
             criterion, optimizers, schedulers = get_optim_configurations(args, models)
-            
+
             # Setup additional criterions with multi-label support
             criterion, criterion_xent, criterion_cent, optimizer_centloss = setup_criterion(args)
 
@@ -217,7 +223,7 @@ if __name__ == '__main__':
                     trial + 1, args.trial, cycle + 1, args.cycle, len(I_index)), flush=True)
             acc, prec, recall, f1  = evaluate_model(args, models, dataloaders)
 
-            #### AL Query ####
+            #### AL Query #### - Modified to add timing statistics
             print("==========Start Querying==========")
             selection_args = dict(I_index=I_index,
                                   O_index=O_index,
@@ -229,11 +235,22 @@ if __name__ == '__main__':
                                   cluster_indices=cluster_indices,
                                   wnet=wnet)
             ALmethod = methods.__dict__[args.method](args, models, unlabeled_dst, U_index, **selection_args)
-            Q_index, Q_scores = ALmethod.select()
 
-            # get query data class - Modified for multi-label support
+            # Add timing statistics
+            select_start_time = time.time()
+            Q_index, Q_scores = ALmethod.select()
+            select_end_time = time.time()
+            select_duration = select_end_time - select_start_time
+
+            # Record time
+            trial_select_times.append(select_duration)
+            all_select_times.append(select_duration)
+
+            print(f"Trial {trial+1}, Cycle {cycle+1} - ALmethod.select() time: {select_duration:.4f}s")
+
+            # Get query data class - Modified for multi-label support
             class_counts = get_query_class_info(args, train_dst, Q_index)
-            
+
             # Print class distribution
             if getattr(args, 'is_multilabel', False):
                 print(f"Query label distribution (multi-label): {dict(class_counts)}")
@@ -254,17 +271,39 @@ if __name__ == '__main__':
                 models = meta_train(args, models, optimizers, schedulers, criterion, dataloaders['train'], unlabeled_loader, delta_loader)
 
             # Update trainloader
-            sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
+            sampler_labeled = SubsetRandomSampler(I_index)
             dataloaders['train'] = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
             if args.method in ['LFOSA', 'EOAL', 'PAL']:
                 query_Q = I_index + O_index
-                sampler_query = SubsetRandomSampler(query_Q)  # make indices initial to the samples
+                sampler_query = SubsetRandomSampler(query_Q)
                 dataloaders['query'] = DataLoader(train_dst, sampler=sampler_query, batch_size=args.batch_size, num_workers=args.workers)
-                ood_query = SubsetRandomSampler(O_index)  # make indices initial to the samples
+                ood_query = SubsetRandomSampler(O_index)
                 dataloaders['ood'] = DataLoader(train_dst, sampler=ood_query, batch_size=args.batch_size, num_workers=args.workers)
 
-            # Log cycle information
-            log_cycle_info(logs, cycle, acc, prec, recall, f1, in_cnt, class_counts)
+            # Log cycle information - Modified to include selection time
+            log_cycle_info(logs, cycle, acc, prec, recall, f1, in_cnt, class_counts, select_duration)
 
-        # Save logs after all cycles
-        save_logs(logs, args, trial)
+        # Record timing summary for each trial after it ends
+        log_trial_timing_summary(logs, trial, trial_select_times)
+
+        # Print time statistics for the current trial
+        if trial_select_times:
+            avg_time = sum(trial_select_times) / len(trial_select_times)
+            total_time = sum(trial_select_times)
+            print(f"Trial {trial+1} Summary:")
+            print(f"  - Average ALmethod.select() time: {avg_time:.4f}s")
+            print(f"  - Total ALmethod.select() time: {total_time:.4f}s")
+            print(f"  - Min time: {min(trial_select_times):.4f}s")
+            print(f"  - Max time: {max(trial_select_times):.4f}s")
+
+        # Save logs after each trial (including time statistics)
+        save_logs(logs, args, trial, all_select_times)
+
+    # Print overall statistics after all trials
+    if all_select_times:
+        print(f"\n========== Overall ALmethod.select() Time Statistics ==========")
+        print(f"Total selection calls: {len(all_select_times)}")
+        print(f"Average time per call: {sum(all_select_times)/len(all_select_times):.4f}s")
+        print(f"Total selection time: {sum(all_select_times):.4f}s")
+        print(f"Min time: {min(all_select_times):.4f}s")
+        print(f"Max time: {max(all_select_times):.4f}s")

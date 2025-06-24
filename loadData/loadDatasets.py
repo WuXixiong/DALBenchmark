@@ -236,6 +236,21 @@ def _configure_dataset_settings(args, trial):
         args.n_class = 5  # Total number of classes in SST5
         args.target_list = list(range(5))  # All classes (for closed set)
         args.num_IN_class = 5  # Number of in-distribution classes
+        if args.openset:
+            # Define different class combinations for trials
+            args.target_lists = [
+                [0, 2], [1, 3], [2, 4], [3, 4],
+                [1, 4], [0, 3], [1, 2],
+                [2, 3], [0, 4],
+                [3, 4]
+            ]
+            if trial >= len(args.target_lists):
+                print(f"Warning: Trial {trial} exceeds available target lists. Using trial % len(target_lists).")
+            args.target_list = args.target_lists[trial % len(args.target_lists)]
+            args.num_IN_class = len(args.target_list)  # Update number of in-distribution classes
+        
+        # Calculate untarget_list (classes that will be treated as OOD)
+        args.untarget_list = list(np.setdiff1d(list(range(args.n_class)), list(args.target_list)))
 
     elif args.dataset == 'RCV1':
         args.input_size = 512  # RCV1 documents are usually long, so a larger input size is needed
@@ -409,14 +424,35 @@ def _configure_dataset_settings(args, trial):
 def _apply_class_conversion(args, train_set, test_set, unlabeled_set):
     """
     Apply class conversion for different dataset types.
-    
+         
     Args:
         args: Arguments containing dataset configuration
         train_set: Training dataset
         test_set: Testing dataset
         unlabeled_set: Unlabeled dataset
     """
+    is_multilabel = getattr(args, 'is_multilabel', False)
+    
+    if is_multilabel:
+        # For multi-label tasks, targets are typically already in the correct format
+        # Multi-label datasets usually don't need class remapping
+        print("Multi-label dataset: skipping class conversion (targets assumed to be in correct format)")
+        
+        # Ensure targets are numpy arrays
+        if hasattr(train_set, 'targets'):
+            if not isinstance(train_set.targets, np.ndarray):
+                train_set.targets = np.array(train_set.targets)
+        if hasattr(test_set, 'targets'):
+            if not isinstance(test_set.targets, np.ndarray):
+                test_set.targets = np.array(test_set.targets)
+        
+        # Copy train_set targets to unlabeled_set
+        if hasattr(train_set, 'targets'):
+            unlabeled_set.targets = train_set.targets.copy()
+        
+        return
 
+    # Single-label processing (original logic)
     if args.textset:
         # For text datasets, ensure proper handling of targets
         if hasattr(train_set, 'targets') and hasattr(test_set, 'targets'):
@@ -425,18 +461,18 @@ def _apply_class_conversion(args, train_set, test_set, unlabeled_set):
                 train_set.targets = np.array(train_set.targets)
             if not isinstance(test_set.targets, np.ndarray):
                 test_set.targets = np.array(test_set.targets)
-                
+                             
             # Mark untarget classes as OOD with temporary value
             for c in args.untarget_list:
                 train_set.targets[train_set.targets == c] = int(args.n_class)
                 test_set.targets[test_set.targets == c] = int(args.n_class)
-            
+                         
             # Sort target list and relabel target classes from 0 to len(target_list)-1
             args.target_list.sort()
             for i, c in enumerate(args.target_list):
                 train_set.targets[train_set.targets == c] = i
                 test_set.targets[test_set.targets == c] = i
-            
+                         
             # Relabel OOD classes to num_IN_class
             # This creates a dedicated OOD class with index equal to num_IN_class
             train_set.targets[train_set.targets == int(args.n_class)] = int(args.num_IN_class)
@@ -470,29 +506,69 @@ def _apply_class_conversion(args, train_set, test_set, unlabeled_set):
 def _report_split_statistics(args, unlabeled_set, test_set):
     """
     Report statistics about the dataset splits.
-    
+         
     Args:
         args: Arguments containing dataset configuration
         unlabeled_set: Unlabeled dataset
         test_set: Testing dataset
     """
+    is_multilabel = getattr(args, 'is_multilabel', False)
+    
     # Split Check and Reporting
     print("Target classes: ", args.target_list)
-    
+         
     # Add subset selection info if applied
     if hasattr(args, 'samples_per_class') and args.samples_per_class is not None:
         print(f"Balanced subset applied: {args.samples_per_class} samples per class")
 
+    def count_labels(dataset_targets, dataset_name):
+        """Helper function to count labels for both single-label and multi-label"""
+        targets = np.array(dataset_targets)
+        
+        if is_multilabel:
+            # Multi-label case
+            if len(targets.shape) == 2:
+                # Multi-hot encoded matrix
+                label_counts = targets.sum(axis=0)
+            else:
+                # Handle other multi-label formats
+                label_counts = np.zeros(len(args.target_list))
+                for target in targets:
+                    if isinstance(target, (torch.Tensor, np.ndarray)):
+                        if target.dim() > 0 and target.shape[0] > 1:
+                            active_labels = torch.nonzero(target, as_tuple=True)[0].cpu().numpy() if isinstance(target, torch.Tensor) else np.nonzero(target)[0]
+                            label_counts[active_labels] += 1
+                        else:
+                            label_idx = target.item() if hasattr(target, 'item') else target
+                            if 0 <= label_idx < len(args.target_list):
+                                label_counts[label_idx] += 1
+                    elif isinstance(target, (list, tuple)):
+                        for label_idx in target:
+                            if 0 <= label_idx < len(args.target_list):
+                                label_counts[label_idx] += 1
+                    else:
+                        if 0 <= target < len(args.target_list):
+                            label_counts[target] += 1
+            
+            uni = np.arange(len(args.target_list))
+            cnt = label_counts.astype(int)
+        else:
+            # Single-label case (original logic)
+            uni, cnt = np.unique(targets, return_counts=True)
+        
+        print(f"{dataset_name}, # samples per class")
+        print(uni, cnt)
+
     if args.method == 'EPIG':
-        uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
-        print("Train, # samples per class")
-        cnt -= args.target_per_class
-        print(uni, cnt)
-    else:    
-        uni, cnt = np.unique(np.array(unlabeled_set.targets), return_counts=True)
-        print("Train, # samples per class")
-        print(uni, cnt)
-    
-    uni, cnt = np.unique(np.array(test_set.targets), return_counts=True)
-    print("Test, # samples per class")
-    print(uni, cnt)
+        targets = np.array(unlabeled_set.targets)
+        if not is_multilabel:
+            uni, cnt = np.unique(targets, return_counts=True)
+            cnt -= args.target_per_class
+            print("Train, # samples per class")
+            print(uni, cnt)
+        else:
+            count_labels(unlabeled_set.targets, "Train")
+    else:
+        count_labels(unlabeled_set.targets, "Train")
+         
+    count_labels(test_set.targets, "Test")
