@@ -1,5 +1,5 @@
 """
-Training functionality for LFOSA method.
+Training functionality for LfOSA method.
 """
 import torch
 import torch.nn as nn
@@ -10,7 +10,7 @@ from utils.general_utils import AverageMeter
 
 def train_epoch_lfosa(args, models, criterion, optimizers, dataloaders, criterion_xent, criterion_cent, optimizer_centloss):
     """
-    Training epoch for LFOSA method.
+    Training epoch for LfOSA method.
     
     Args:
         args: arguments object with training parameters

@@ -8,10 +8,8 @@ from tqdm import tqdm
 
 from trainers.base_trainer_tester import train, train_epoch, train_epoch_nlp, test, test_nlp, test_ood, test_ood_nlp
 from trainers.lfosa_trainer import train_epoch_lfosa, train_epoch_lfosa_nlp
-from trainers.eoal_trainer import train_epoch_eoal
 from trainers.ll_trainer import train_epoch_ll
 from trainers.tidal_trainer import train_epoch_tidal
-from trainers.pal_trainer import train_pal_cls_epoch, train_pal_meta_epoch
 from trainers.mqnet_trainer import meta_train
 from trainers.ccal_trainer import self_sup_train
 from utils.ema import ModelEMA
@@ -83,9 +81,6 @@ def train_model(args, trial, models, criterion, optimizers, schedulers, dataload
                 else:
                     train_epoch_lfosa(args, models, criterion, optimizers, dataloaders, criterion_xent, criterion_cent, optimizer_centloss)
                 schedulers['ood_detection'].step()
-            elif args.method == 'EOAL':
-                train_epoch_eoal(args, models, criterion, optimizers, dataloaders, criterion_xent, O_index, cluster_centers, cluster_labels, cluster_indices)
-                schedulers['ood_detection'].step()
         
         writer.close()
     
@@ -139,13 +134,13 @@ def evaluate_model(args, models, dataloaders):
         Test accuracy
     """
     if args.textset:  # text dataset
-        if 'ood_detection' in models and args.method in ['LFOSA', 'EOAL', 'PAL']:
+        if 'ood_detection' in models and args.method in ['LFOSA']:
             test_ood_nlp(args, models, dataloaders)
             return test_nlp(args, models, dataloaders)
         else:
             return test_nlp(args, models, dataloaders)
     else:
-        if 'ood_detection' in models and args.method in ['LFOSA', 'EOAL', 'PAL']:
+        if 'ood_detection' in models and args.method in ['LFOSA']:
             test_ood(args, models, dataloaders)
             return test(args, models, dataloaders)
         else:

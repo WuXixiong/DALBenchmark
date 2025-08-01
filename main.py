@@ -57,7 +57,7 @@ if __name__ == '__main__':
         sampler_test = SubsetSequentialSampler(test_I_index)
         train_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
         test_loader = DataLoader(test_dst, sampler=sampler_test, batch_size=args.test_batch_size, num_workers=args.workers)
-        if args.method in ['LFOSA', 'EOAL', 'PAL']:
+        if args.method in ['LFOSA']:
             ood_detection_index = I_index + O_index
             sampler_ood = SubsetRandomSampler(O_index)  # make indices initial to the samples
             sampler_query = SubsetRandomSampler(ood_detection_index)  # make indices initial to the samples
@@ -67,7 +67,7 @@ if __name__ == '__main__':
             unlabeled_loader = DataLoader(train_dst, sampler=sampler_unlabeled, batch_size=args.batch_size, num_workers=args.workers)
         dataloaders = {'train': train_loader, 'test': test_loader}
 
-        if args.method in ['LFOSA', 'EOAL', 'PAL']:
+        if args.method in ['LFOSA']:
             dataloaders = {'train': train_loader, 'query': query_loader, 'test': test_loader, 'ood': ood_dataloader, 'unlabeled': unlabeled_loader}
 
         # Initialize logs
@@ -91,7 +91,7 @@ if __name__ == '__main__':
             # Loss, criterion and scheduler (re)initialization
             criterion, optimizers, schedulers = get_optim_configurations(args, models)
 
-            # for LFOSA and EOAL...
+            # for LFOSA...
             criterion_xent = torch.nn.CrossEntropyLoss()
             if args.textset: # text dataset
                 criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=768, use_gpu=True) # feat_dim = first dim of
@@ -99,18 +99,12 @@ if __name__ == '__main__':
             else: # for images
                 criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=512, use_gpu=True) # feat_dim = first dim of feature (output,feature from model return)
                 optimizer_centloss = torch.optim.SGD(criterion_cent.parameters(), lr=args.lr_cent)
-            # PAL wnet
-            ood_num = (args.num_IN_class+1)*2
-            wnet, optimizer_wnet = set_Wnet(args, ood_num)
 
             # Self-supervised Training (for CCAL and MQ-Net with CSI)
             if cycle == 0:
                 models = self_sup_train(args, trial, models, optimizers, schedulers, train_dst, I_index, O_index, U_index)
 
-            # EOAL
             cluster_centers, cluster_labels, cluster_indices = [], [], []
-            if args.method == 'EOAL':
-                cluster_centers, _, cluster_labels, cluster_indices = unknown_clustering(args, models['ood_detection'], models['model_bc'], dataloaders['ood'], args.target_list)
 
             # Training
             t = time.time()
@@ -133,8 +127,7 @@ if __name__ == '__main__':
                                   cur_cycle=cycle,
                                   cluster_centers=cluster_centers,
                                   cluster_labels=cluster_labels,
-                                  cluster_indices=cluster_indices,
-                                  wnet=wnet)
+                                  cluster_indices=cluster_indices)
             ALmethod = methods.__dict__[args.method](args, models, unlabeled_dst, U_index, **selection_args)
 
             # Add timing statistics
@@ -170,7 +163,7 @@ if __name__ == '__main__':
             # Update trainloader
             sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
             dataloaders['train'] = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
-            if args.method in ['LFOSA', 'EOAL', 'PAL']:
+            if args.method in ['LFOSA']:
                 query_Q = I_index + O_index
                 sampler_query = SubsetRandomSampler(query_Q)  # make indices initial to the samples
                 dataloaders['query'] = DataLoader(train_dst, sampler=sampler_query, batch_size=args.batch_size, num_workers=args.workers)

@@ -1,5 +1,5 @@
 """
-Training functionality for TIDAL method.
+Training functionality for TiDAL method.
 """
 import torch
 import torch.nn as nn
@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 def train_epoch_tidal(args, models, optimizers, dataloaders, epoch):
     """
-    Training epoch for TIDAL method.
+    Training epoch for TiDAL method.
     
     Args:
         args: arguments object with training parameters
