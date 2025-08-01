@@ -1,4 +1,16 @@
-import copy
+"""
+This implementation is primarily based on the official open-source code of:
+GitHub: https://github.com/AminParvaneh/alpha_mix_active_learning
+Paper: https://openaccess.thecvf.com/content/CVPR2022/html/Parvaneh_Active_Learning_by_Feature_Mixing_CVPR_2022_paper.html
+
+@inproceedings{parvaneh2022active,
+  title={Active Learning by Feature Mixing},
+  author={Parvaneh, Amin and Abbasnejad, Ehsan and Teney, Damien and Haffari, Gholamreza Reza and van den Hengel, Anton and Shi, Javen Qinfeng},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={12237--12246},
+  year={2022}
+}
+"""
 import math
 import numpy as np
 from torch.autograd import Variable
@@ -14,7 +26,6 @@ class AlphaMixSampling(ALMethod):
 		self.I_index = I_index
 		self.labeled_set = torch.utils.data.Subset(unlabeled_dst, I_index)
 		self.fc2 = None
-		self.is_multilabel = getattr(args, 'is_multilabel', False)
 		# subset settings
 		subset_idx = np.random.choice(len(self.U_index), size=(min(self.args.subset, len(self.U_index)),), replace=False)
 		self.U_index_sub = np.array(self.U_index)[subset_idx]
@@ -62,12 +73,7 @@ class AlphaMixSampling(ALMethod):
 					else:
 						inputs = data[0].to(self.args.device)
 						preds, embedding = self.models['backbone'](inputs)
-					
-					# Convert logits to probabilities based on task type
-					if self.is_multilabel:
-						probs = torch.sigmoid(preds)
-					else:
-						probs = torch.nn.functional.softmax(preds, dim=1)
+					probs = torch.nn.functional.softmax(preds, dim=1)
 
 					# If this is the first batch, initialize all_probs and all_embeddings
 					if ulb_probs is None:
@@ -78,17 +84,8 @@ class AlphaMixSampling(ALMethod):
 					ulb_probs = torch.cat((ulb_probs, probs), dim=0)
 					org_ulb_embedding = torch.cat((org_ulb_embedding, embedding), dim=0)
 
-		# Get predictions based on task type
-		if self.is_multilabel:
-			# For multi-label: use highest probability classes (could be multiple)
-			pred_1 = (ulb_probs > 0.5).float()
-			# For gradient calculation, use the most confident positive prediction per sample
-			max_prob_indices = ulb_probs.argmax(dim=1)
-		else:
-			# For single-label: get the class with highest probability
-			probs_sorted, probs_sort_idxs = ulb_probs.sort(descending=True)
-			pred_1 = probs_sort_idxs[:, 0]
-			max_prob_indices = pred_1
+		probs_sorted, probs_sort_idxs = ulb_probs.sort(descending=True)
+		pred_1 = probs_sort_idxs[:, 0]
 
 		labeled_loader = torch.utils.data.DataLoader(self.labeled_set, batch_size=self.args.test_batch_size, num_workers=self.args.workers)
 		batch_num = len(labeled_loader)
@@ -104,19 +101,13 @@ class AlphaMixSampling(ALMethod):
 						input_ids = data['input_ids'].to(self.args.device)
 						attention_mask = data['attention_mask'].to(self.args.device)
 						outputs = self.models['backbone'](input_ids=input_ids, attention_mask=attention_mask)
-						preds = outputs.logits
 						hidden_states = outputs.hidden_states
 						last_hidden_state = hidden_states[-1]
 						embedding = last_hidden_state[:, 0, :]
 					else:
 						inputs = data[0].to(self.args.device)
 						preds, embedding = self.models['backbone'](inputs)
-					
-					# Convert logits to probabilities based on task type
-					if self.is_multilabel:
-						probs = torch.sigmoid(preds)
-					else:
-						probs = torch.nn.functional.softmax(preds, dim=1)
+					probs = torch.nn.functional.softmax(preds, dim=1)
 
 					# If this is the first batch, initialize all_probs and all_embeddings
 					if lb_probs is None:
@@ -139,15 +130,7 @@ class AlphaMixSampling(ALMethod):
 		if self.args.alpha_closed_form_approx:
 			var_emb = Variable(ulb_embedding, requires_grad=True).to(self.args.device)
 			out = self.fc2(var_emb)
-			
-			# Calculate loss based on task type
-			if self.is_multilabel:
-				# For multi-label: use BCE loss with the predicted labels
-				loss = F.binary_cross_entropy_with_logits(out, pred_1.to(self.args.device))
-			else:
-				# For single-label: use cross-entropy loss
-				loss = F.cross_entropy(out, max_prob_indices.to(self.args.device))
-			
+			loss = F.cross_entropy(out, pred_1.to(self.args.device))
 			grads = torch.autograd.grad(loss, var_emb)[0].data.cpu()
 			del loss, var_emb, out
 		else:
@@ -157,29 +140,10 @@ class AlphaMixSampling(ALMethod):
 		while alpha_cap < 1.0:
 			alpha_cap += self.args.alpha_cap
 
-			# Get targets from labeled set
-			if self.is_multilabel:
-				# For multi-label: get all targets (could be multiple per sample)
-				selected_targets = []
-				for i in self.I_index:
-					target = self.labeled_set.dataset.targets[i]
-					if isinstance(target, torch.Tensor):
-						if target.dim() > 0:
-							# Multi-hot encoded
-							active_labels = torch.nonzero(target, as_tuple=True)[0].tolist()
-							selected_targets.extend(active_labels)
-						else:
-							selected_targets.append(target.item())
-					else:
-						selected_targets.append(target)
-			else:
-				# For single-label: get single target per sample
-				selected_targets = [self.labeled_set.dataset.targets[i] for i in self.I_index]
-			
+			selected_targets = [self.labeled_set.dataset.targets[i] for i in self.I_index]
 			tmp_pred_change, tmp_min_alphas = \
 				self.find_candidate_set(
-					lb_embedding, ulb_embedding, pred_1 if self.is_multilabel else max_prob_indices, 
-					ulb_probs, alpha_cap=alpha_cap,
+					lb_embedding, ulb_embedding, pred_1, ulb_probs, alpha_cap=alpha_cap,
 					Y=selected_targets, # targets in labelled data
 					grads=grads)
 			
@@ -222,7 +186,6 @@ class AlphaMixSampling(ALMethod):
 		return selected_idxs, scores
 
 	def find_alpha(self):
-		# This method remains largely unchanged as it appears to be for analysis/debug purposes
 		assert self.args.alpha_num_mix <= self.args.n_label - (
 			0 if self.args.alpha_use_highest_class_mix else 1), 'c_num_mix should not be greater than number of classes'
 
@@ -230,16 +193,10 @@ class AlphaMixSampling(ALMethod):
 
 		ulb_probs, ulb_embedding = self.predict_prob_embed(self.X[idxs_unlabeled], self.Y[idxs_unlabeled])
 
-		if self.is_multilabel:
-			pred_1 = (ulb_probs > 0.5).float()
-			gt_lables = self.Y[idxs_unlabeled]
-			# For multi-label, check if any predicted labels match ground truth
-			preds = torch.any(pred_1 * gt_lables, dim=1) if gt_lables.dim() > 1 else pred_1.argmax(dim=1) == gt_lables
-		else:
-			probs_sorted, probs_sort_idxs = ulb_probs.sort(descending=True)
-			pred_1 = probs_sort_idxs[:, 0]
-			gt_lables = self.Y[idxs_unlabeled]
-			preds = pred_1 == gt_lables
+		probs_sorted, probs_sort_idxs = ulb_probs.sort(descending=True)
+		pred_1 = probs_sort_idxs[:, 0]
+		gt_lables = self.Y[idxs_unlabeled]
+		preds = pred_1 == gt_lables
 
 		ulb_embedding = ulb_embedding[preds]
 		ulb_probs = ulb_probs[preds]
@@ -281,26 +238,9 @@ class AlphaMixSampling(ALMethod):
 			grads = grads.to(self.args.device)
 			
 		for i in range(int(self.args.n_class)):
-			# Get embeddings for class i
-			if self.is_multilabel:
-				# For multi-label: Y might contain multiple labels per sample
-				if isinstance(Y, list):
-					emb_indices = [j for j, labels in enumerate(Y) if i in (labels if isinstance(labels, list) else [labels])]
-				else:
-					# If Y is tensor, handle accordingly
-					emb_indices = [j for j in range(len(Y)) if Y[j] == i]
-				
-				if len(emb_indices) > 0:
-					emb = lb_embedding[emb_indices]
-				else:
-					emb = lb_embedding
-			else:
-				# For single-label: standard class filtering
-				Y_tensor = torch.tensor(Y) if not isinstance(Y, torch.Tensor) else Y
-				emb = lb_embedding[Y_tensor == i]
-				if emb.size(0) == 0:
-					emb = lb_embedding
-					
+			emb = lb_embedding[Y == i]
+			if emb.size(0) == 0:
+				emb = lb_embedding
 			anchor_i = emb.mean(dim=0).view(1, -1).repeat(unlabeled_size, 1)
 
 			if self.args.alpha_closed_form_approx:
@@ -312,17 +252,7 @@ class AlphaMixSampling(ALMethod):
 				out = out.detach().cpu()
 				alpha = alpha.cpu()
 
-				# Calculate prediction change based on task type
-				if self.is_multilabel:
-					# For multi-label: check if any predicted labels change
-					new_pred = (torch.sigmoid(out) > 0.5).float()
-					if pred_1.dim() > 1:
-						pc = ~torch.all(new_pred == pred_1.cpu(), dim=1)
-					else:
-						pc = new_pred.argmax(dim=1) != pred_1.cpu()
-				else:
-					# For single-label: check if top prediction changes
-					pc = out.argmax(dim=1) != pred_1
+				pc = out.argmax(dim=1) != pred_1
 			else:
 				alpha = self.generate_alpha(unlabeled_size, embedding_size, alpha_cap)
 				if self.args.alpha_opt:
@@ -335,17 +265,9 @@ class AlphaMixSampling(ALMethod):
 					embedding_mix = (1 - alpha) * ulb_embedding + alpha * anchor_i
 					out = self.fc2(embedding_mix.to(self.args.device))
 					out = out.detach().cpu()
-					pred_1_cpu = pred_1.detach().cpu()
+					pred_1 = pred_1.detach().cpu()
 
-					# Calculate prediction change based on task type
-					if self.is_multilabel:
-						new_pred = (torch.sigmoid(out) > 0.5).float()
-						if pred_1_cpu.dim() > 1:
-							pc = ~torch.all(new_pred == pred_1_cpu, dim=1)
-						else:
-							pc = new_pred.argmax(dim=1) != pred_1_cpu
-					else:
-						pc = out.argmax(dim=1) != pred_1_cpu
+					pc = out.argmax(dim=1) != pred_1
 
 			torch.cuda.empty_cache()
 
@@ -398,11 +320,7 @@ class AlphaMixSampling(ALMethod):
 		min_alpha = torch.ones(alpha.size(), dtype=torch.float)
 		pred_changed = torch.zeros(labels.size(0), dtype=torch.bool)
 
-		# Choose loss function based on task type
-		if self.is_multilabel:
-			loss_func = torch.nn.BCEWithLogitsLoss(reduction='none')
-		else:
-			loss_func = torch.nn.CrossEntropyLoss(reduction='none')
+		loss_func = torch.nn.CrossEntropyLoss(reduction='none')
 
 		# self.model.clf.eval()
 		self.models['backbone'].eval()
@@ -423,16 +341,7 @@ class AlphaMixSampling(ALMethod):
 
 				out = self.fc2(embedding_mix)
 
-				# Calculate label change based on task type
-				if self.is_multilabel:
-					new_pred = (torch.sigmoid(out) > 0.5).float()
-					current_labels = labels[start_idx:end_idx]
-					if current_labels.dim() > 1:
-						label_change = ~torch.all(new_pred == current_labels, dim=1)
-					else:
-						label_change = new_pred.argmax(dim=1) != current_labels
-				else:
-					label_change = out.argmax(dim=1) != labels[start_idx:end_idx]
+				label_change = out.argmax(dim=1) != labels[start_idx:end_idx]
 
 				tmp_pc = torch.zeros(labels.size(0), dtype=torch.bool).to(self.args.device)
 				tmp_pc[start_idx:end_idx] = label_change
@@ -441,18 +350,7 @@ class AlphaMixSampling(ALMethod):
 				tmp_pc[start_idx:end_idx] = tmp_pc[start_idx:end_idx] * (l.norm(dim=1) < min_alpha[start_idx:end_idx].norm(dim=1).to(self.args.device))
 				min_alpha[tmp_pc] = l[tmp_pc[start_idx:end_idx]].detach().cpu()
 
-				# Calculate loss based on task type
-				current_labels_batch = labels[start_idx:end_idx].to(self.args.device)
-				if self.is_multilabel:
-					if current_labels_batch.dim() == 1:
-						# Convert single labels to multi-hot if needed
-						current_labels_one_hot = torch.zeros_like(out)
-						current_labels_one_hot.scatter_(1, current_labels_batch.unsqueeze(1), 1)
-						current_labels_batch = current_labels_one_hot
-					clf_loss = loss_func(out, current_labels_batch.float())
-					clf_loss = clf_loss.mean(dim=1)  # Average across labels
-				else:
-					clf_loss = loss_func(out, current_labels_batch)
+				clf_loss = loss_func(out, labels[start_idx:end_idx].to(self.args.device))
 
 				l2_nrm = torch.norm(l, dim=1)
 

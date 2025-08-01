@@ -20,106 +20,6 @@ import methods as methods
 from collections import Counter
 from logger import initialize_log, log_cycle_info, save_logs, log_trial_timing_summary
 
-def get_query_class_info(args, train_dst, Q_index):
-    """
-    Extract class information from query indices, supporting both single-label and multi-label.
-    
-    Args:
-        args: Arguments containing dataset configuration
-        train_dst: Training dataset
-        Q_index: Query indices
-        
-    Returns:
-        class_counts: Counter object with class distribution
-    """
-    is_multilabel = getattr(args, 'is_multilabel', False)
-    
-    if args.textset:
-        if is_multilabel:
-            # Multi-label: labels is a tensor/array with multiple labels
-            Q_classes = []
-            for idx in Q_index:
-                labels = train_dst[idx]['labels']
-                if isinstance(labels, torch.Tensor):
-                    # If it's a multi-hot vector, get indices of positive labels
-                    if len(labels.shape) > 0 and labels.shape[0] > 1:
-                        active_labels = torch.nonzero(labels, as_tuple=True)[0].tolist()
-                        Q_classes.extend(active_labels)
-                    else:
-                        # Single label in tensor format
-                        Q_classes.append(labels.item())
-                elif isinstance(labels, (list, np.ndarray)):
-                    # If it's a list of active label indices
-                    Q_classes.extend(labels)
-                else:
-                    # Single label
-                    Q_classes.append(labels)
-        else:
-            # Single-label: labels is a single value
-            Q_classes = [train_dst[idx]['labels'].item() if isinstance(train_dst[idx]['labels'], torch.Tensor) 
-                        else train_dst[idx]['labels'] for idx in Q_index]
-    else:
-        # Image dataset
-        if is_multilabel:
-            Q_classes = []
-            for idx in Q_index:
-                labels = train_dst[idx][1]
-                if isinstance(labels, torch.Tensor):
-                    if len(labels.shape) > 0 and labels.shape[0] > 1:
-                        active_labels = torch.nonzero(labels, as_tuple=True)[0].tolist()
-                        Q_classes.extend(active_labels)
-                    else:
-                        Q_classes.append(labels.item())
-                elif isinstance(labels, (list, np.ndarray)):
-                    Q_classes.extend(labels)
-                else:
-                    Q_classes.append(labels)
-        else:
-            Q_classes = [train_dst[idx][1] for idx in Q_index]
-    
-    class_counts = Counter(Q_classes)
-    return class_counts
-
-def setup_criterion(args):
-    """
-    Setup appropriate loss functions based on task type.
-    
-    Args:
-        args: Arguments containing dataset configuration
-        
-    Returns:
-        Dictionary containing different loss functions
-    """
-    is_multilabel = getattr(args, 'is_multilabel', False)
-    
-    # Main criterion for training
-    if is_multilabel:
-        criterion = torch.nn.BCEWithLogitsLoss()
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
-    
-    # Additional criterions for specific methods
-    criterion_xent = torch.nn.CrossEntropyLoss()  # Always cross-entropy for some methods
-    
-    # Center loss configuration
-    if args.textset:  # text dataset
-        feat_dim = 768  # BERT feature dimension
-    else:  # image dataset
-        feat_dim = 512  # Typical image feature dimension
-        
-    criterion_cent = CenterLoss(
-        num_classes=args.num_IN_class + 1, 
-        feat_dim=feat_dim, 
-        use_gpu=True
-    )
-    
-    if args.textset:
-        optimizer_centloss = torch.optim.AdamW(criterion_cent.parameters(), lr=0.005)
-    else:
-        optimizer_centloss = torch.optim.SGD(criterion_cent.parameters(), lr=args.lr_cent)
-    
-    return criterion, criterion_xent, criterion_cent, optimizer_centloss
-
 # Main
 if __name__ == '__main__':
     # Training settings
@@ -146,9 +46,6 @@ if __name__ == '__main__':
         torch.backends.cudnn.deterministic = True
 
         train_dst, unlabeled_dst, test_dst = get_dataset(args, trial)
-        if args.method == 'TIDAL':
-            train_dst.init_tidal_params(len(args.target_list))
-            unlabeled_dst.init_tidal_params(len(args.target_list))
 
         # Initialize a labeled dataset by randomly sampling K=1,000 points from the entire dataset.
         I_index, O_index, U_index, Q_index = [], [], [], []
@@ -156,14 +53,14 @@ if __name__ == '__main__':
         test_I_index = get_sub_test_dataset(args, test_dst)
 
         # DataLoaders
-        sampler_labeled = SubsetRandomSampler(I_index)
+        sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
         sampler_test = SubsetSequentialSampler(test_I_index)
         train_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
         test_loader = DataLoader(test_dst, sampler=sampler_test, batch_size=args.test_batch_size, num_workers=args.workers)
         if args.method in ['LFOSA', 'EOAL', 'PAL']:
             ood_detection_index = I_index + O_index
-            sampler_ood = SubsetRandomSampler(O_index)
-            sampler_query = SubsetRandomSampler(ood_detection_index)
+            sampler_ood = SubsetRandomSampler(O_index)  # make indices initial to the samples
+            sampler_query = SubsetRandomSampler(ood_detection_index)  # make indices initial to the samples
             query_loader = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
             ood_dataloader = DataLoader(train_dst, sampler=sampler_ood, batch_size=args.batch_size, num_workers=args.workers)
             sampler_unlabeled = SubsetRandomSampler(U_index)
@@ -191,13 +88,17 @@ if __name__ == '__main__':
             print("| Training on model %s" % args.model)
             models = get_models(args, nets, args.model, models)
             torch.backends.cudnn.benchmark = False
-
-            # Loss, criterion and scheduler (re)initialization - Modified for multi-label support
+            # Loss, criterion and scheduler (re)initialization
             criterion, optimizers, schedulers = get_optim_configurations(args, models)
 
-            # Setup additional criterions with multi-label support
-            criterion, criterion_xent, criterion_cent, optimizer_centloss = setup_criterion(args)
-
+            # for LFOSA and EOAL...
+            criterion_xent = torch.nn.CrossEntropyLoss()
+            if args.textset: # text dataset
+                criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=768, use_gpu=True) # feat_dim = first dim of
+                optimizer_centloss = torch.optim.AdamW(criterion_cent.parameters(), lr=0.005)
+            else: # for images
+                criterion_cent = CenterLoss(num_classes=args.num_IN_class+1, feat_dim=512, use_gpu=True) # feat_dim = first dim of feature (output,feature from model return)
+                optimizer_centloss = torch.optim.SGD(criterion_cent.parameters(), lr=args.lr_cent)
             # PAL wnet
             ood_num = (args.num_IN_class+1)*2
             wnet, optimizer_wnet = set_Wnet(args, ood_num)
@@ -223,7 +124,7 @@ if __name__ == '__main__':
                     trial + 1, args.trial, cycle + 1, args.cycle, len(I_index)), flush=True)
             acc, prec, recall, f1  = evaluate_model(args, models, dataloaders)
 
-            #### AL Query #### - Modified to add timing statistics
+            #### AL Query ####
             print("==========Start Querying==========")
             selection_args = dict(I_index=I_index,
                                   O_index=O_index,
@@ -241,21 +142,17 @@ if __name__ == '__main__':
             Q_index, Q_scores = ALmethod.select()
             select_end_time = time.time()
             select_duration = select_end_time - select_start_time
-
             # Record time
             trial_select_times.append(select_duration)
             all_select_times.append(select_duration)
-
             print(f"Trial {trial+1}, Cycle {cycle+1} - ALmethod.select() time: {select_duration:.4f}s")
 
-            # Get query data class - Modified for multi-label support
-            class_counts = get_query_class_info(args, train_dst, Q_index)
-
-            # Print class distribution
-            if getattr(args, 'is_multilabel', False):
-                print(f"Query label distribution (multi-label): {dict(class_counts)}")
+            # get query data class
+            if args.textset:
+                Q_classes = [train_dst[idx]['labels'].item() for idx in Q_index]
             else:
-                print(f"Query class distribution: {dict(class_counts)}")
+                Q_classes = [train_dst[idx][1] for idx in Q_index]
+            class_counts = Counter(Q_classes)
 
             # Update Indices
             I_index, O_index, U_index, in_cnt = get_sub_train_dataset(args, train_dst, I_index, O_index, U_index, Q_index, initial=False)
@@ -271,21 +168,20 @@ if __name__ == '__main__':
                 models = meta_train(args, models, optimizers, schedulers, criterion, dataloaders['train'], unlabeled_loader, delta_loader)
 
             # Update trainloader
-            sampler_labeled = SubsetRandomSampler(I_index)
+            sampler_labeled = SubsetRandomSampler(I_index)  # make indices initial to the samples
             dataloaders['train'] = DataLoader(train_dst, sampler=sampler_labeled, batch_size=args.batch_size, num_workers=args.workers)
             if args.method in ['LFOSA', 'EOAL', 'PAL']:
                 query_Q = I_index + O_index
-                sampler_query = SubsetRandomSampler(query_Q)
+                sampler_query = SubsetRandomSampler(query_Q)  # make indices initial to the samples
                 dataloaders['query'] = DataLoader(train_dst, sampler=sampler_query, batch_size=args.batch_size, num_workers=args.workers)
-                ood_query = SubsetRandomSampler(O_index)
+                ood_query = SubsetRandomSampler(O_index)  # make indices initial to the samples
                 dataloaders['ood'] = DataLoader(train_dst, sampler=ood_query, batch_size=args.batch_size, num_workers=args.workers)
 
-            # Log cycle information - Modified to include selection time
+            # Log cycle information
             log_cycle_info(logs, cycle, acc, prec, recall, f1, in_cnt, class_counts, select_duration)
 
         # Record timing summary for each trial after it ends
         log_trial_timing_summary(logs, trial, trial_select_times)
-
         # Print time statistics for the current trial
         if trial_select_times:
             avg_time = sum(trial_select_times) / len(trial_select_times)
@@ -296,9 +192,11 @@ if __name__ == '__main__':
             print(f"  - Min time: {min(trial_select_times):.4f}s")
             print(f"  - Max time: {max(trial_select_times):.4f}s")
 
-        # Save logs after each trial (including time statistics)
-        save_logs(logs, args, trial, all_select_times)
-
+        # Save logs after all cycles
+        save_logs(logs, args, trial)
+        print("========== End of Trial {} ==========".format(trial + 1))
+        print("\n")
+        
     # Print overall statistics after all trials
     if all_select_times:
         print(f"\n========== Overall ALmethod.select() Time Statistics ==========")
