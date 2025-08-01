@@ -1,3 +1,16 @@
+"""
+This implementation is primarily based on the official open-source code of:
+GitHub: https://github.com/ningkp/LfOSA
+Paper: https://openaccess.thecvf.com/content/CVPR2022/html/Ning_Active_Learning_for_Open-Set_Annotation_CVPR_2022_paper.html
+
+@inproceedings{ning2022active,
+  title={Active learning for open-set annotation},
+  author={Ning, Kun-Peng and Zhao, Xun and Li, Yu and Huang, Sheng-Jun},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={41--49},
+  year={2022}
+}
+"""
 import numpy as np
 from sklearn.mixture import GaussianMixture
 import torch

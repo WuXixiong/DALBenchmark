@@ -1,3 +1,19 @@
+"""
+This implementation of the CCAL active learning algorithm is adapted from:
+- The MQNet repository (https://github.com/kaist-dmlab/MQNet), which provides an implementation of CCAL and other methods.
+
+MQNet's implementation is based on:
+- Official CCAL code: https://github.com/RUC-DWBI-ML/CCAL
+
+@InProceedings{Du_2021_ICCV,
+    author    = {Du, Pan and Zhao, Suyun and Chen, Hui and Chai, Shuwen and Chen, Hong and Li, Cuiping},
+    title     = {Contrastive Coding for Active Learning Under Class Distribution Mismatch},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+    month     = {October},
+    year      = {2021},
+    pages     = {8927-8936}
+}
+"""
 from .almethod import ALMethod
 import torch
 import numpy as np

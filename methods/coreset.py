@@ -1,3 +1,17 @@
+"""
+This implementation of the Coreset active learning algorithm is adapted from:
+- The MQNet repository (https://github.com/kaist-dmlab/MQNet), which provides an implementation of Coreset and other methods.
+
+MQNet's implementation is based on:
+- Official Coreset code: https://github.com/svdesai/coreset-al
+
+@article{sener2017active,
+  title={Active learning for convolutional neural networks: A core-set approach},
+  author={Sener, Ozan and Savarese, Silvio},
+  journal={arXiv preprint arXiv:1708.00489},
+  year={2017}
+}
+"""
 from .almethod import ALMethod
 import torch
 import numpy as np

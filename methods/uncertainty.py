@@ -1,3 +1,14 @@
+"""
+This implementation of the these classic uncertainty-based active learning algorithms is adapted from:
+- The DeepAL+ repository (https://github.com/SineZHAN/deepALplus), which provides an implementation of these classic uncertainty-based active learning algorithms and other methods.
+
+@article{zhan2022comparative,
+  title={A comparative survey of deep active learning},
+  author={Zhan, Xueying and Wang, Qingzhong and Huang, Kuan-hao and Xiong, Haoyi and Dou, Dejing and Chan, Antoni B},
+  journal={arXiv preprint arXiv:2203.13450},
+  year={2022}
+}
+"""
 from .almethod import ALMethod 
 import torch
 import numpy as np

@@ -1,12 +1,22 @@
+"""
+This implementation is primarily based on the official open-source code of:
+GitHub: https://github.com/hyperconnect/TiDAL
+Paper: https://openaccess.thecvf.com/content/ICCV2023/html/Kye_TiDAL_Learning_Training_Dynamics_for_Active_Learning_ICCV_2023_paper.html
+
+@inproceedings{kye2023tidal,
+  title={TiDAL: Learning training dynamics for active learning},
+  author={Kye, Seong Min and Choi, Kwanghee and Byun, Hyeongmin and Chang, Buru},
+  booktitle={Proceedings of the IEEE/CVF international conference on computer vision},
+  pages={22335--22345},
+  year={2023}
+}
+"""
 from .almethod import ALMethod
 import torch
 import numpy as np
 from tqdm import tqdm
 
 class TIDAL(ALMethod):
-    '''
-    https://github.com/hyperconnect/TiDAL
-    '''
     def __init__(self, args, models, unlabeled_dst, U_index, **kwargs):
         super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
         # subset selection (for diversity)

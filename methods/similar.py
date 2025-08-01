@@ -1,3 +1,19 @@
+"""
+This implementation of the SIMILAR active learning algorithm is adapted from:
+- The MQNet repository (https://github.com/kaist-dmlab/MQNet), which provides an implementation of SIMILAR and other methods.
+
+MQNet's implementation is based on:
+- Official SIMILAR code: https://github.com/decile-team/distil
+
+@article{kothawade2021similar,
+  title={Similar: Submodular information measures based active learning in realistic scenarios},
+  author={Kothawade, Suraj and Beck, Nathan and Killamsetty, Krishnateja and Iyer, Rishabh},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
+  pages={18685--18697},
+  year={2021}
+}
+"""
 from .almethod import ALMethod
 import torch
 import numpy as np

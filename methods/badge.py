@@ -1,3 +1,17 @@
+"""
+This implementation of the BADGE active learning algorithm is adapted from:
+- The MQNet repository (https://github.com/kaist-dmlab/MQNet), which provides an implementation of BADGE and other methods.
+
+MQNet's implementation is based on:
+- Official BADGE code: https://github.com/JordanAsh/badge
+
+@article{ash2019deep,
+  title={Deep batch active learning by diverse, uncertain gradient lower bounds},
+  author={Ash, Jordan T and Zhang, Chicheng and Krishnamurthy, Akshay and Langford, John and Agarwal, Alekh},
+  journal={arXiv preprint arXiv:1906.03671},
+  year={2019}
+}
+"""
 import torch 
 import numpy as np
 from tqdm import tqdm 

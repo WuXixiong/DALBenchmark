@@ -1,3 +1,18 @@
+"""
+This implementation of the LL (Learning Loss) active learning algorithm is adapted from:
+- The MQNet repository (https://github.com/kaist-dmlab/MQNet), which provides an implementation of LL and other methods.
+
+MQNet's implementation is based on:
+- Official LL code: https://github.com/Mephisto405/Learning-Loss-for-Active-Learning
+
+@inproceedings{yoo2019learning,
+  title={Learning loss for active learning},
+  author={Yoo, Donggeun and Kweon, In So},
+  booktitle={Proceedings of the IEEE/CVF conference on computer vision and pattern recognition},
+  pages={93--102},
+  year={2019}
+}
+"""
 from .almethod import ALMethod
 import torch
 import numpy as np

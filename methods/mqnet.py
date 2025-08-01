@@ -1,3 +1,15 @@
+"""
+This implementation is primarily based on the official open-source code of:
+GitHub: https://github.com/kaist-dmlab/MQNet
+Paper: https://proceedings.neurips.cc/paper_files/paper/2022/hash/cba6f4460a1f395f68a88598c86e79bd-Abstract-Conference.html
+
+@article{park2022meta,
+  title={Meta-Query-Net: Resolving Purity-Informativeness Dilemma in Open-set Active Learning},
+  author={Park, Dongmin and Shin, Yooju and Bang, Jihwan and Lee, Youngjun and Song, Hwanjun and Lee, Jae-Gil},
+  journal={NeurIPS 2022},
+  year={2022}
+}
+"""
 from .almethod import ALMethod
 import torch
 import numpy as np

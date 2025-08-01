@@ -1,3 +1,16 @@
+"""
+This implementation is primarily based on the official open-source code of:
+GitHub: https://github.com/Javadzb/Class-Balanced-AL
+Paper: https://openaccess.thecvf.com/content/WACV2022/html/Bengar_Class-Balanced_Active_Learning_for_Image_Classification_WACV_2022_paper.html
+
+@inproceedings{bengar2022class,
+  title={Class-balanced active learning for image classification},
+  author={Bengar, Javad Zolfaghari and van de Weijer, Joost and Fuentes, Laura Lopez and Raducanu, Bogdan},
+  booktitle={Proceedings of the IEEE/CVF winter conference on applications of computer vision},
+  pages={1536--1545},
+  year={2022}
+}
+"""
 from .almethod import ALMethod
 import torch
 import numpy as np

@@ -6,6 +6,4 @@ from .lossnet import *
 # from .querynet_non_relu import *
 from .querynet import *
 
-from .vae import *
 from .tdnet import *
-from .eoalnet import *

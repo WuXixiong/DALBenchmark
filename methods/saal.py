@@ -1,3 +1,17 @@
+"""
+This implementation is primarily based on the official open-source code of:
+GitHub: https://github.com/YoonyeongKim/SAAL
+Paper: https://proceedings.mlr.press/v202/kim23c.html
+
+@inproceedings{kim2023saal,
+  title={Saal: sharpness-aware active learning},
+  author={Kim, Yoon-Yeong and Cho, Youngjae and Jang, JoonHo and Na, Byeonghu and Kim, Yeongmin and Song, Kyungwoo and Kang, Wanmo and Moon, Il-Chul},
+  booktitle={International Conference on Machine Learning},
+  pages={16424--16440},
+  year={2023},
+  organization={PMLR}
+}
+"""
 from .almethod import ALMethod   
 import torch
 import numpy as np

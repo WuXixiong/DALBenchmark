@@ -1,3 +1,16 @@
+"""
+This implementation is primarily based on the official open-source code of:
+GitHub: https://github.com/davidtw999/BEMPS
+Paper: https://proceedings.neurips.cc/paper/2021/hash/5a7b238ba0f6502e5d6be14424b20ded-Abstract.html
+
+@article{tan2021diversity,
+  title={Diversity Enhanced Active Learning with Strictly Proper Scoring Rules},
+  author={Tan, Wei and Du, Lan and Buntine, Wray},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
+  year={2021}
+}
+"""
 from .almethod import ALMethod
 import torch
 import numpy as np
