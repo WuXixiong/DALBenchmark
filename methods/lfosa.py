@@ -16,7 +16,6 @@ from sklearn.mixture import GaussianMixture
 import torch
 from .almethod import ALMethod
 
-
 class LFOSA(ALMethod):
     def __init__(self, args, models, unlabeled_dst, U_index, I_index, **kwargs):
         super().__init__(args, models, unlabeled_dst, U_index, **kwargs)
@@ -90,19 +89,8 @@ class LFOSA(ALMethod):
                 tmp_data = np.hstack((prob.reshape(-1, 1), S_ij[tmp_class]))
             else:
                 tmp_data = np.vstack((tmp_data, np.hstack((prob.reshape(-1, 1), S_ij[tmp_class]))))
-        
-        # tmp_data = tmp_data.T
-        # scores = tmp_data[2]
-        # return scores
-
 
         tmp_data = tmp_data[np.argsort(tmp_data[:, 0])] # scores
         tmp_data = tmp_data.T
         queryIndex = tmp_data[2][-self.args.n_query:].astype(int)
         return queryIndex, tmp_data
-        # labelArr = tmp_data[3].astype(int)
-        # queryLabelArr = tmp_data[3][-args.query_batch:]
-        # precision = len(np.where(queryLabelArr < args.known_class)[0]) / len(queryLabelArr)
-        # recall = (len(np.where(queryLabelArr < args.known_class)[0]) + Len_labeled_ind_train) / (
-        #     len(np.where(labelArr < args.known_class)[0]) + Len_labeled_ind_train)
-        # return queryIndex[np.where(queryLabelArr < args.known_class)[0]], queryIndex[np.where(queryLabelArr >= args.known_class)[0]], precision, recall

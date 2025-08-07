@@ -1,4 +1,3 @@
-# logger.py
 import datetime
 import os
 
@@ -25,47 +24,45 @@ def initialize_log(args, trial):
     logs.append(["Initial training set size:" + str(args.n_initial)])
     logs.append([])
     
-    # 修改表头，添加选择时间列
     logs.append(['Cycle | ', 'Test Accuracy | ', 'Precision | ', 'Recall | ', 'F1-Score | ', 
                 'Number of in-domain query data | ', 'Selection Time (s) | ', 'Queried Classes'])
     
-    # 添加时间统计初始化
-    logs.append([])  # 空行分隔
+    logs.append([])
     logs.append(["=== Selection Time Statistics ==="])
     
     return logs
 
 def log_cycle_info(logs, cycle, acc, prec, recall, f1, in_cnt, class_counts, select_time=None):
     """
-    记录每个cycle的信息，包括选择时间
-    
+    Logs information for each cycle, including selection time.
+
     Args:
-        logs: 日志列表
-        cycle: 当前cycle编号
-        acc: 准确率
-        prec: 精确率
-        recall: 召回率
-        f1: F1分数
-        in_cnt: 域内查询数据数量
-        class_counts: 类别分布
-        select_time: ALmethod.select()执行时间（秒）
+        logs: List of log entries
+        cycle: Current cycle number
+        acc: Accuracy
+        prec: Precision
+        recall: Recall
+        f1: F1 score
+        in_cnt: Number of in-domain queried data
+        class_counts: Class distribution
+        select_time: Execution time of ALmethod.select() in seconds
     """
     from collections import Counter
     my_dict = dict(Counter(class_counts))
     sorted_dict = dict(sorted(my_dict.items()))
     
-    # 如果没有提供选择时间，设置为N/A
+    # If no selection time is provided, set to N/A
     time_str = f"{select_time:.4f}" if select_time is not None else "N/A"
     
     logs.append([cycle + 1, acc, prec, recall, f1, in_cnt, time_str, sorted_dict])
 
 def finalize_timing_stats(logs, all_select_times):
     """
-    在日志末尾添加时间统计摘要
-    
+    Appends a summary of time statistics to the end of the logs.
+
     Args:
-        logs: 日志列表
-        all_select_times: 所有选择时间的列表
+        logs: List of log entries
+        all_select_times: List of all selection times
     """
     if not all_select_times:
         return
@@ -81,15 +78,15 @@ def finalize_timing_stats(logs, all_select_times):
 
 def save_logs(logs, args, trial, all_select_times=None):
     """
-    保存日志到文件
-    
+    Saves the logs to a file.
+
     Args:
-        logs: 日志列表
-        args: 参数
-        trial: 试验编号
-        all_select_times: 所有选择时间列表（可选）
+        logs: List of log entries
+        args: Parameters
+        trial: Trial number
+        all_select_times: List of all selection times (optional)
     """
-    # 如果提供了时间统计，添加到日志末尾
+    # If time statistics are provided, add them to the end of the log
     if all_select_times:
         finalize_timing_stats(logs, all_select_times)
     
@@ -138,12 +135,12 @@ def save_logs(logs, args, trial, all_select_times=None):
 
 def log_trial_timing_summary(logs, trial, trial_select_times):
     """
-    记录单个trial的时间统计摘要
-    
+    Logs the time statistics summary for a single trial.
+
     Args:
-        logs: 日志列表
-        trial: 试验编号
-        trial_select_times: 当前trial的选择时间列表
+        logs: List of log entries
+        trial: Trial number
+        trial_select_times: List of selection times for the current trial
     """
     if not trial_select_times:
         return

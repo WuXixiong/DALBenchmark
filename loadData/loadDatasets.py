@@ -132,47 +132,7 @@ def get_dataset(args, trial):
             train_set = MyTREC6Dataset(trec6_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             test_set = MyTREC6Dataset(trec6_dataset['test'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
             unlabeled_set = MyTREC6Dataset(trec6_dataset['train'], tokenizer=tokenizer, imbalance_factor=args.imb_factor)
-        elif args.dataset == 'RCV1':
-            # RCV1 dataset paths 
-            data_dir = getattr(args, 'data_dir', '/home/cwu1/sv12/chenkaiwu/DALBenchmark/data/rcv1/')
-            train_file = os.path.join(data_dir, 'rcv1_train_meanir_10.json')
-            test_file = os.path.join(data_dir, 'rcv1_test_meanir_10.json')
-            
-            # RCV1 parameters
-            max_length = getattr(args, 'max_length', 512)  # RCV1 documents are usually longer
-            use_keywords = getattr(args, 'use_keywords', False)  # Whether to use keywords
-            
-            # Create training dataset
-            train_set = MyRCV1Dataset(
-                data_files=train_file, 
-                tokenizer=tokenizer, 
-                imbalance_factor=args.imb_factor,
-                max_length=max_length,
-                use_keywords=use_keywords
-            )
-            
-            # Create test dataset  
-            test_set = MyRCV1Dataset(
-                data_files=test_file, 
-                tokenizer=tokenizer, 
-                imbalance_factor=args.imb_factor, 
-                max_length=max_length,
-                use_keywords=use_keywords
-            )
-            
-            test_set.mlb = train_set.mlb
-            test_set.classes = train_set.classes  
-            test_set.num_classes = train_set.num_classes
-            test_set.encoded_labels = test_set.mlb.transform(test_set.labels)
-            test_set.targets = torch.tensor(test_set.encoded_labels, dtype=torch.float)
-            
-            unlabeled_set = MyRCV1Dataset(
-                data_files=train_file, 
-                tokenizer=tokenizer, 
-                imbalance_factor=args.imb_factor,
-                max_length=max_length,
-                use_keywords=use_keywords
-            )
+
         else:
             raise ValueError(f"Text dataset '{args.dataset}' is not supported. Please choose from the available text datasets.")
     else:

@@ -9,24 +9,6 @@ parser.add_argument("--init_dist", type=str, default='random',
                     help="uniform / random.")
 parser.add_argument("--chunk_size", type=int, default=10,
                     help="divide dataset into chunk_size parts")
-# PAL
-parser.add_argument('--wdecay', default=5e-4, type=float,help='weight decay')
-parser.add_argument('--use-ema',  action='store_true', default=True, help='use EMA model')
-parser.add_argument('--ema-decay', default=0.999, type=float,help='EMA decay rate')
-parser.add_argument('--is-filter', type=bool, default=True)
-parser.add_argument('--is-mini', type=bool, default=True)
-parser.add_argument('--lr_wnet', type=float, default=6e-5)
-parser.add_argument('--meta-step', default=100, type=int, help='number of eval steps to run')
-parser.add_argument('--miu', default=1.0, type=float)
-parser.add_argument('--need-ID', type=int, default=1450)
-# VESSAL
-parser.add_argument('--zeta', help='z_t in equation 3', type=float, default=1)
-parser.add_argument('--single_pass', default=False, action='store_true')
-parser.add_argument('--embs', default="grad_embs", help="whether to use gradient embeddings (grad_embs) or penultimate layer embeddings (penultimate).", type=str)
-parser.add_argument('--rank', help='rank of the sample-wise fisher information matrix', type=int, default=1)
-parser.add_argument('--cov_inv_scaling', help='covariance inverse scaling', type=float, default=100)
-parser.add_argument('--early_stop', default=False, action='store_true')
-parser.add_argument('--fill_random', default=True, action='store_true')
 # SAAL
 parser.add_argument('--acqMode', default='Max_Diversity', type=str, help='acquisition mode / Max (max_perturbed_loss), Diff (max_perturbed_loss-original_loss), Max_Diversity, Diff_Diversity')
 parser.add_argument('--labelMode', default='Pseudo', type=str, help='label mode / True (sharpness with true label), Pseudo (sharpness with pseudo label), InversePseudo (sharpness with inverse pseudo label')
@@ -85,7 +67,7 @@ parser.add_argument('--seed', default=0, type=int, help="random seed")
 parser.add_argument('-j', '--workers', default=5, type=int, help='number of data loading workers (default: 4)')
 parser.add_argument("--no-ssl-save", action="store_false", dest="ssl_save", help="disable saving ssl model (saves by default)")
 parser.add_argument('--is_multilabel', action='store_true', help='multi-label classification task')
-# === Balanced Subset Selection Parameters ===
+# Balanced Subset Selection Parameters 
 parser.add_argument('--samples-per-class', type=int, default=None,
                    help='Number of samples to select per class for balanced subset. '
                         'If None, use the full dataset. Example: 1000 for DBpedia means '
@@ -96,7 +78,7 @@ parser.add_argument('--apply-subset-to-test', action='store_true', default=False
 parser.add_argument('--subset-random-seed', type=int, default=42,
                    help='Random seed for balanced subset selection. '
                         'Ensures reproducible subset selection across runs')
-# === Optional: Subset Configuration Presets ===
+# Optional: Subset Configuration Presets
 parser.add_argument('--subset-preset', type=str, default=None,
                    choices=['small', 'medium', 'large', 'custom'],
                    help='Predefined subset sizes: '
@@ -104,7 +86,7 @@ parser.add_argument('--subset-preset', type=str, default=None,
                         'medium (500-2000 per class), '
                         'large (2000+ per class), '
                         'custom (use --samples-per-class value)')
-# === Enhanced Reporting ===
+# Enhanced Reporting
 parser.add_argument('--verbose-subset', action='store_true', default=False,
                    help='Enable verbose output for subset selection process, '
                         'including detailed class distribution statistics')
